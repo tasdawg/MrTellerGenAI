@@ -2,12 +2,14 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt } from './utils/db';
 import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
 import { CONFIG } from './utils/config';
-import { SUBJECT_TYPES, STYLE_PRESETS, LIGHTING_OPTIONS, CAMERA_ANGLES, VARIATION_COUNTS, REFERENCE_USAGE_OPTIONS, SURPRISE_IDEAS, QUICK_CHIPS, DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES } from './utils/constants';
+import { SUBJECT_TYPES, STYLE_PRESETS, LIGHTING_OPTIONS, CAMERA_ANGLES, VARIATION_COUNTS, REFERENCE_USAGE_OPTIONS, SURPRISE_IDEAS, QUICK_CHIPS, DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, REVERSE_ENGINEER_EXAMPLES } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
@@ -101,6 +103,11 @@ const App = () => {
     // AI Tools State
     const [isDecoding, setIsDecoding] = useState(false);
     const [decodedPromptJson, setDecodedPromptJson] = useState<DecodedPrompt | null>(null);
+    const [reverseEngineerImage, setReverseEngineerImage] = useState<string | null>(null);
+    const [reverseEngineerImageMimeType, setReverseEngineerImageMimeType] = useState('');
+    const [isReverseEngineering, setIsReverseEngineering] = useState(false);
+    const [reverseEngineeredPrompt, setReverseEngineeredPrompt] = useState('');
+
 
     // Photorealistic Studio State (lifted from component)
     const [photorealisticSettings, setPhotorealisticSettings] = useState(initialCreatorState?.photorealisticSettings ?? {
@@ -688,6 +695,54 @@ const App = () => {
         setActiveTab('creator');
     };
 
+    const handleReverseEngineerPrompt = useCallback(async () => {
+        if (!ai || !reverseEngineerImage) return;
+        setIsReverseEngineering(true);
+        setError(null);
+        setReverseEngineeredPrompt('');
+
+        const instruction = `
+            You are an expert at reverse engineering images to create highly detailed, cinematic, and optimized prompts for an image generation AI. Analyze the provided reference image and generate a new prompt in the style of the following examples. The goal is to capture the essence, style, composition, lighting, and subject of the reference image, but described in a rich, evocative way like the examples.
+
+            IMPORTANT: If the reference image contains a person, the generated prompt MUST include the phrase 'using the original face' or 'without changing the face' to instruct the image generator to preserve the person's likeness.
+
+            Here are examples of the desired prompt structure and style:
+            ${REVERSE_ENGINEER_EXAMPLES}
+
+            ---
+
+            Now, analyze the user's uploaded image and generate a new, optimized prompt based on it, following the style of the examples above. Output ONLY the final prompt text.
+        `;
+
+        try {
+            const base64Data = reverseEngineerImage.split(',')[1];
+            const imagePart = { inlineData: { mimeType: reverseEngineerImageMimeType, data: base64Data } };
+            const textPart = { text: instruction };
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [imagePart, textPart] },
+            });
+            setReverseEngineeredPrompt(response.text.trim());
+        } catch (e) {
+            setError("Failed to reverse engineer the prompt from the image.");
+            console.error(e);
+        } finally {
+            setIsReverseEngineering(false);
+        }
+    }, [ai, reverseEngineerImage, reverseEngineerImageMimeType]);
+    
+    const handleApplyReverseEngineeredPrompt = () => {
+        if (!reverseEngineeredPrompt || !reverseEngineerImage) return;
+        // Set the prompt in the creator
+        setOptimisedPrompt(reverseEngineeredPrompt);
+        // Set the image as a subject reference in the creator
+        setSubjectReferenceImage(reverseEngineerImage);
+        setSubjectReferenceImageMimeType(reverseEngineerImageMimeType);
+        // Switch to the creator tab
+        setActiveTab('creator');
+    };
+
     // --- Collection Handlers ---
     const handleAddDummyData = async () => {
         if (!s3Available) {
@@ -732,8 +787,8 @@ const App = () => {
     // --- Props for children ---
     const creatorState = { idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative, variationCount, optimisedPrompt, generatedImages, isOptimising, isGenerating, error, copySuccess, subjectReferenceImage, styleReferenceImage, isGettingIdea, referenceUsage, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
     const creatorHandlers = { setIdea, setSubjectType, setStylePreset, setLighting, setCameraAngle, setQualityBoost, setAddNegative, setVariationCount, setOptimisedPrompt, setReferenceUsage, handleOptimizeClick, handleGenerateImage, handleCopyPrompt, handleSurpriseMe, handleQuickChip, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings };
-    const aiToolsState = { isDecoding, decodedPromptJson, s3Available };
-    const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt };
+    const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
+    const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt };
 
     return (
         <div className="h-screen bg-black flex flex-col p-4 gap-4 text-gray-200">
