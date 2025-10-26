@@ -1,14 +1,17 @@
 
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt } from './utils/db';
-import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl } from './utils/s3';
+import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
+import { CONFIG } from './utils/config';
 import { SUBJECT_TYPES, STYLE_PRESETS, LIGHTING_OPTIONS, CAMERA_ANGLES, VARIATION_COUNTS, REFERENCE_USAGE_OPTIONS, SURPRISE_IDEAS, QUICK_CHIPS, DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
 import { AITools } from './components/AITools';
+import { S3ConfigModal } from './components/S3ConfigModal';
 
 // --- HELPER FOR S3 ERROR DIAGNOSIS ---
 const getS3ErrorMessage = (e: any): string => {
@@ -116,8 +119,43 @@ const App = () => {
         aspectRatio: '9:16',
     });
 
-    // S3 Availability State
+    // S3 State
+    const [s3Config, setS3ConfigState] = useState(CONFIG.s3);
+    const [isS3ConfigModalOpen, setIsS3ConfigModalOpen] = useState(false);
     const [s3Available, setS3Available] = useState(true);
+
+    // --- S3 CONFIGURATION HANDLING ---
+    useEffect(() => {
+        // Load S3 config from localStorage on initial load
+        try {
+            const savedS3Config = localStorage.getItem('s3-config');
+            if (savedS3Config) {
+                const parsedConfig = JSON.parse(savedS3Config);
+                setS3ConfigState(parsedConfig);
+            } else {
+                // If no config saved, prompt user to configure it
+                setError("S3 is not configured. Please go to the Collection tab to set it up.");
+                setS3Available(false);
+            }
+        } catch (e) {
+            console.error("Failed to load S3 config from localStorage", e);
+            setS3ConfigState(CONFIG.s3);
+        }
+    }, []);
+
+    useEffect(() => {
+        // Whenever s3Config state changes, update the s3 utility
+        setS3Config(s3Config);
+    }, [s3Config]);
+    
+    const handleSaveS3Config = useCallback((newConfig: any) => {
+        setS3ConfigState(newConfig);
+        localStorage.setItem('s3-config', JSON.stringify(newConfig));
+        setIsS3ConfigModalOpen(false);
+        // Automatically trigger a refresh to test the new config
+        handleRefresh();
+    }, []);
+
 
     // --- S3 DATA HANDLING ---
     const handleRefresh = useCallback(async () => {
@@ -186,7 +224,7 @@ const App = () => {
             console.error("Failed to refresh from S3", e);
             setS3Available(wasAvailable => {
                 if (wasAvailable) { // Only show error when transitioning from good to bad state
-                    setError(`S3 Connection Failed: ${getS3ErrorMessage(e)}. Images will now be stored in-memory for this session.`);
+                    setError(`S3 Connection Failed: ${getS3ErrorMessage(e)}. Images will now be stored in-memory for this session. Please check your S3 configuration in the Collection tab.`);
                 }
                 return false;
             });
@@ -197,9 +235,13 @@ const App = () => {
         }
     }, []);
 
-    // Initial load from S3
+    // Initial load from S3 after config is settled
     useEffect(() => {
-        handleRefresh();
+        // A small delay to allow config to be set from localstorage
+        const timer = setTimeout(() => {
+            handleRefresh();
+        }, 100);
+        return () => clearTimeout(timer);
     }, [handleRefresh]);
 
     // Save creator state to localStorage whenever it changes
@@ -667,6 +709,12 @@ const App = () => {
 
     return (
         <div className="h-screen bg-black flex flex-col p-4 gap-4 text-gray-200">
+            <S3ConfigModal 
+                isOpen={isS3ConfigModalOpen}
+                onClose={() => setIsS3ConfigModalOpen(false)}
+                onSave={handleSaveS3Config}
+                initialConfig={s3Config}
+            />
             <nav className="flex-shrink-0 bg-gray-900 p-2 flex items-center justify-center gap-2">
                 <button onClick={() => setActiveTab('creator')} className={`px-6 py-2 font-semibold transition ${activeTab === 'creator' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
                     Creator
@@ -697,13 +745,13 @@ const App = () => {
                     />
                 )}
                 {activeTab === 'collection' && (
-                    // Fix: Removed props that are not defined on the CollectionComponent to resolve TypeScript error.
                     <CollectionComponent
                         collection={collection}
                         onRefresh={handleRefresh}
                         isRefreshing={isRefreshing}
                         onAddDummyData={handleAddDummyData}
                         s3Available={s3Available}
+                        onConfigureS3={() => setIsS3ConfigModalOpen(true)}
                     />
                 )}
                  {activeTab === 'ai_tools' && (

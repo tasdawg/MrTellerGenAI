@@ -56,30 +56,33 @@ const CollectionItemCard = ({ item }: { item: CollectionItem }) => {
     return null; // Fallback for unknown types
 };
 
-export const Collection = ({ collection, onRefresh, isRefreshing, onAddDummyData, s3Available }: { collection: CollectionType, onRefresh: () => void, isRefreshing: boolean, onAddDummyData: () => void, s3Available: boolean }) => {
+export const Collection = ({ collection, onRefresh, isRefreshing, onAddDummyData, s3Available, onConfigureS3 }: { collection: CollectionType, onRefresh: () => void, isRefreshing: boolean, onAddDummyData: () => void, s3Available: boolean, onConfigureS3: () => void }) => {
     const [selectedFolderId, setSelectedFolderId] = useState(collection.folders[0]?.id || null);
     
     React.useEffect(() => {
         if (!selectedFolderId && collection.folders.length > 0) {
             setSelectedFolderId(collection.folders[0].id);
         }
-         if (collection.folders.length > 0 && !collection.folders.find((f: any) => f.id === selectedFolderId)) {
+         if (collection.folders.length > 0 && !collection.folders.find((f) => f.id === selectedFolderId)) {
             setSelectedFolderId(collection.folders[0].id);
         }
     }, [collection.folders, selectedFolderId]);
 
-    const selectedFolder = collection.folders.find((f: any) => f.id === selectedFolderId);
+    const selectedFolder = collection.folders.find((f) => f.id === selectedFolderId);
 
     return (
         <div className="flex flex-col md:flex-row gap-4 h-full bg-black/50 p-6">
             <aside className="md:w-1/3 lg:w-1/4 bg-gray-900 p-4 flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-white">My Collections</h2>
+                 <button onClick={onConfigureS3} className="w-full p-2 bg-gray-700 hover:bg-gray-600 text-white font-bold transition">
+                    ⚙️ Configure S3
+                </button>
                  <button onClick={onRefresh} disabled={isRefreshing || !s3Available} className="w-full p-2 bg-gray-300 hover:bg-gray-400 text-black font-bold transition disabled:bg-gray-800 disabled:text-gray-500 flex items-center justify-center gap-2">
                     {isRefreshing ? <div className="spinner !w-5 !h-5 !border-black"></div> : '🔄'}
                     Refresh from S3
                 </button>
                 <div className="flex-grow overflow-y-auto space-y-2">
-                    {collection.folders.map((folder: any) => (
+                    {collection.folders.map((folder) => (
                         <button
                             key={folder.id}
                             onClick={() => setSelectedFolderId(folder.id)}
@@ -113,7 +116,7 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onAddDummyData
                         <h3 className="text-lg font-bold mb-4">{selectedFolder.name}</h3>
                         {selectedFolder.items.length > 0 ? (
                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                {selectedFolder.items.map((item: any) => (
+                                {selectedFolder.items.map((item) => (
                                     <CollectionItemCard key={item.id} item={item} />
                                 ))}
                             </div>
@@ -126,7 +129,8 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onAddDummyData
                     </div>
                 ) : (
                     <div className="text-center text-gray-500 flex items-center justify-center h-full">
-                        {!isRefreshing && <p>No collections found in S3. Try adding dummy data or generating an image.</p>}
+                        {!s3Available && !isRefreshing && <p>S3 connection failed or is not configured. Please use the 'Configure S3' button.</p>}
+                        {s3Available && !isRefreshing && <p>No collections found in S3. Try adding dummy data or generating an image.</p>}
                     </div>
                 )}
             </main>

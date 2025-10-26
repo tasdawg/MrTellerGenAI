@@ -118,42 +118,54 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                     </div>
                 </div>
                 
+                {/* FIX: Wrapped children in CollapsibleSection to fix missing 'children' prop error. */}
                 <CollapsibleSection title="Fine-Tuning" defaultOpen={true}>
-                    {renderFormControl("Subject Type", <select value={subjectType} onChange={(e) => setSubjectType(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {SUBJECT_TYPES.map(s => <option key={s}>{s}</option>)} </select>)}
-                    {renderFormControl("Style Preset", <select value={stylePreset} onChange={(e) => setStylePreset(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {STYLE_PRESETS.map(s => <option key={s}>{s}</option>)} </select>)}
-                    {renderFormControl("Lighting", <select value={lighting} onChange={(e) => setLighting(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {LIGHTING_OPTIONS.map(l => <option key={l}>{l}</option>)} </select>)}
-                    {renderFormControl("Camera Angle", <select value={cameraAngle} onChange={(e) => setCameraAngle(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {CAMERA_ANGLES.map(c => <option key={c}>{c}</option>)} </select>)}
+                    <>
+                        {renderFormControl("Subject Type", <select value={subjectType} onChange={(e) => setSubjectType(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {SUBJECT_TYPES.map(s => <option key={s}>{s}</option>)} </select>)}
+                        {renderFormControl("Style Preset", <select value={stylePreset} onChange={(e) => setStylePreset(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {STYLE_PRESETS.map(s => <option key={s}>{s}</option>)} </select>)}
+                        {renderFormControl("Lighting", <select value={lighting} onChange={(e) => setLighting(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {LIGHTING_OPTIONS.map(l => <option key={l}>{l}</option>)} </select>)}
+                        {renderFormControl("Camera Angle", <select value={cameraAngle} onChange={(e) => setCameraAngle(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"> {CAMERA_ANGLES.map(c => <option key={c}>{c}</option>)} </select>)}
+                    </>
                 </CollapsibleSection>
                 
+                {/* FIX: Wrapped children in CollapsibleSection to fix missing 'children' prop error. */}
                 <CollapsibleSection title="Advanced Settings">
-                     <div className="space-y-4">
-                        <ToggleSwitch id="quality-boost" checked={qualityBoost} onChange={(e) => setQualityBoost(e.target.checked)} label="Quality Boost"/>
-                        <ToggleSwitch id="add-negative" checked={addNegative} onChange={(e) => setAddNegative(e.target.checked)} label="Add Negative Prompt"/>
-                    </div>
-                     {hasOneReference && (
-                        renderFormControl("Reference Usage", <select value={referenceUsage} onChange={(e) => setReferenceUsage(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition">{REFERENCE_USAGE_OPTIONS.map(s => <option key={s}>{s}</option>)}</select>)
-                    )}
-                    <div>
-                        {renderFormControl("Variations", <select value={variationCount} onChange={(e) => setVariationCount(Number(e.target.value))} disabled={hasAnyReference} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed">{VARIATION_COUNTS.map(v => <option key={v} value={v}>{v} Image{v > 1 ? 's' : ''}</option>)}</select>)}
-                        {hasAnyReference && <p className="text-xs text-gray-500 mt-1">Variations are disabled when using a reference image.</p>}
-                    </div>
+                     <>
+                        <div className="space-y-4">
+                            <ToggleSwitch id="quality-boost" checked={qualityBoost} onChange={(e) => setQualityBoost(e.target.checked)} label="Quality Boost"/>
+                            <ToggleSwitch id="add-negative" checked={addNegative} onChange={(e) => setAddNegative(e.target.checked)} label="Add Negative Prompt"/>
+                        </div>
+                         {hasOneReference && (
+                            renderFormControl("Reference Usage", <select value={referenceUsage} onChange={(e) => setReferenceUsage(e.target.value)} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition">{REFERENCE_USAGE_OPTIONS.map(s => <option key={s}>{s}</option>)}</select>)
+                        )}
+                        <div>
+                            {renderFormControl("Variations", <select value={variationCount} onChange={(e) => setVariationCount(Number(e.target.value))} disabled={hasAnyReference} className="w-full p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed">{VARIATION_COUNTS.map(v => <option key={v} value={v}>{v} Image{v > 1 ? 's' : ''}</option>)}</select>)}
+                            {hasAnyReference && <p className="text-xs text-gray-500 mt-1">Variations are disabled when using a reference image.</p>}
+                        </div>
+                    </>
                 </CollapsibleSection>
 
+                 {/* FIX: Wrapped children in CollapsibleSection to fix missing 'children' prop error. */}
                  <CollapsibleSection title="Inspiration Tools">
-                    <button onClick={handleSurpriseMe} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300">🎲 Surprise Me</button>
-                    <div className="text-sm font-medium text-gray-400">Quick Chips:</div>
-                    <div className="flex flex-wrap gap-2">
-                        {QUICK_CHIPS.map(chip => (
-                            <button key={chip.name} onClick={() => handleQuickChip(chip.settings)} className="bg-gray-700 hover:bg-gray-600 text-xs font-semibold py-1 px-3 transition duration-300">{chip.name}</button>
-                        ))}
-                    </div>
+                    <>
+                        <button onClick={handleSurpriseMe} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300">🎲 Surprise Me</button>
+                        <div className="text-sm font-medium text-gray-400">Quick Chips:</div>
+                        <div className="flex flex-wrap gap-2">
+                            {QUICK_CHIPS.map(chip => (
+                                <button key={chip.name} onClick={() => handleQuickChip(chip.settings)} className="bg-gray-700 hover:bg-gray-600 text-xs font-semibold py-1 px-3 transition duration-300">{chip.name}</button>
+                            ))}
+                        </div>
+                    </>
                 </CollapsibleSection>
 
+                {/* FIX: Wrapped children in CollapsibleSection to fix missing 'children' prop error. */}
                 <CollapsibleSection title="Asian Photorealism Studio">
-                    <PhotorealisticSection
-                        settings={photorealisticSettings}
-                        onSettingsChange={setPhotorealisticSettings}
-                    />
+                    <>
+                        <PhotorealisticSection
+                            settings={photorealisticSettings}
+                            onSettingsChange={setPhotorealisticSettings}
+                        />
+                    </>
                 </CollapsibleSection>
 
             </aside>
