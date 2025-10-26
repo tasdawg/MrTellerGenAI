@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt } from './utils/db';
@@ -11,7 +12,7 @@ import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
 import { AITools } from './components/AITools';
-import { S3ConfigModal } from './components/S3ConfigModal';
+import { SettingsModal } from './components/SettingsModal';
 
 // --- HELPER FOR S3 ERROR DIAGNOSIS ---
 const getS3ErrorMessage = (e: any): string => {
@@ -61,6 +62,8 @@ const App = () => {
 
     const [activeTab, setActiveTab] = useState('creator');
     const [ai, setAi] = useState<GoogleGenAI | null>(null);
+    const [apiKey, setApiKey] = useState('');
+
     const [idea, setIdea] = useState(initialCreatorState?.idea ?? "a dog surfing at sunset");
     const [subjectType, setSubjectType] = useState(initialCreatorState?.subjectType ?? SUBJECT_TYPES[2]);
     const [stylePreset, setStylePreset] = useState(initialCreatorState?.stylePreset ?? STYLE_PRESETS[0]);
@@ -119,13 +122,23 @@ const App = () => {
         aspectRatio: '9:16',
     });
 
-    // S3 State
+    // S3 & Settings State
     const [s3Config, setS3ConfigState] = useState(CONFIG.s3);
-    const [isS3ConfigModalOpen, setIsS3ConfigModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [s3Available, setS3Available] = useState(true);
 
-    // --- S3 CONFIGURATION HANDLING ---
+
+    // --- S3 & API KEY CONFIGURATION HANDLING ---
     useEffect(() => {
+        // Load API Key from localStorage on initial load
+        const savedApiKey = localStorage.getItem('gemini-api-key');
+        if (savedApiKey) {
+            setApiKey(savedApiKey);
+        } else {
+            setError("Welcome! Please configure your Gemini API Key in settings to enable AI features.");
+            setIsSettingsModalOpen(true);
+        }
+
         // Load S3 config from localStorage on initial load
         try {
             const savedS3Config = localStorage.getItem('s3-config');
@@ -133,8 +146,7 @@ const App = () => {
                 const parsedConfig = JSON.parse(savedS3Config);
                 setS3ConfigState(parsedConfig);
             } else {
-                // If no config saved, prompt user to configure it
-                setError("S3 is not configured. Please go to the Collection tab to set it up.");
+                setError(prev => prev ? `${prev}\n\nS3 is not configured. Go to Settings > S3 Storage to set it up.` : "S3 is not configured. Please go to the Collection tab to set it up.");
                 setS3Available(false);
             }
         } catch (e) {
@@ -148,11 +160,37 @@ const App = () => {
         setS3Config(s3Config);
     }, [s3Config]);
     
-    const handleSaveS3Config = useCallback((newConfig: any) => {
-        setS3ConfigState(newConfig);
-        localStorage.setItem('s3-config', JSON.stringify(newConfig));
-        setIsS3ConfigModalOpen(false);
-        // Automatically trigger a refresh to test the new config
+     useEffect(() => {
+        if (apiKey) {
+            try {
+                const genAI = new GoogleGenAI({ apiKey });
+                setAi(genAI);
+                // Clear API key related errors if any
+                if (error?.includes("API Key")) {
+                    setError(null);
+                }
+            } catch (e) {
+                setError("Failed to initialize GoogleGenAI. Your API key might be invalid. Please check it in Settings.");
+                console.error(e);
+                setAi(null);
+            }
+        } else {
+            setAi(null); // No AI instance if no key
+        }
+    }, [apiKey, error]);
+    
+    const handleSaveSettings = useCallback(({ apiKey: newApiKey, s3Config: newS3Config }) => {
+        // Save and update API Key
+        setApiKey(newApiKey);
+        localStorage.setItem('gemini-api-key', newApiKey);
+
+        // Save and update S3 Config
+        setS3ConfigState(newS3Config);
+        localStorage.setItem('s3-config', JSON.stringify(newS3Config));
+        
+        setIsSettingsModalOpen(false);
+        
+        // Automatically trigger a refresh to test the new S3 config
         handleRefresh();
     }, []);
 
@@ -224,7 +262,7 @@ const App = () => {
             console.error("Failed to refresh from S3", e);
             setS3Available(wasAvailable => {
                 if (wasAvailable) { // Only show error when transitioning from good to bad state
-                    setError(`S3 Connection Failed: ${getS3ErrorMessage(e)}. Images will now be stored in-memory for this session. Please check your S3 configuration in the Collection tab.`);
+                    setError(`S3 Connection Failed: ${getS3ErrorMessage(e)}. Images will now be stored in-memory for this session. Please check your S3 configuration in Settings.`);
                 }
                 return false;
             });
@@ -263,16 +301,6 @@ const App = () => {
         styleReferenceImage, styleReferenceImageMimeType, referenceUsage, strictFaceLock, strictHairLock,
         photorealisticSettings
     ]);
-
-    useEffect(() => {
-        try {
-            const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            setAi(genAI);
-        } catch (e) {
-            setError("Failed to initialize GoogleGenAI. Please check your API key.");
-            console.error(e);
-        }
-    }, []);
 
     const optimizePrompt = useCallback(async (currentSettings: any) => {
         if (!ai) return;
@@ -702,18 +730,19 @@ const App = () => {
     };
 
     // --- Props for children ---
-    const creatorState = { idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative, variationCount, optimisedPrompt, generatedImages, isOptimising, isGenerating, error, copySuccess, subjectReferenceImage, styleReferenceImage, isGettingIdea, referenceUsage, strictFaceLock, strictHairLock, s3Available, photorealisticSettings };
+    const creatorState = { idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative, variationCount, optimisedPrompt, generatedImages, isOptimising, isGenerating, error, copySuccess, subjectReferenceImage, styleReferenceImage, isGettingIdea, referenceUsage, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
     const creatorHandlers = { setIdea, setSubjectType, setStylePreset, setLighting, setCameraAngle, setQualityBoost, setAddNegative, setVariationCount, setOptimisedPrompt, setReferenceUsage, handleOptimizeClick, handleGenerateImage, handleCopyPrompt, handleSurpriseMe, handleQuickChip, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings };
     const aiToolsState = { isDecoding, decodedPromptJson, s3Available };
     const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt };
 
     return (
         <div className="h-screen bg-black flex flex-col p-4 gap-4 text-gray-200">
-            <S3ConfigModal 
-                isOpen={isS3ConfigModalOpen}
-                onClose={() => setIsS3ConfigModalOpen(false)}
-                onSave={handleSaveS3Config}
-                initialConfig={s3Config}
+            <SettingsModal 
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                onSave={handleSaveSettings}
+                initialApiKey={apiKey}
+                initialS3Config={s3Config}
             />
             <nav className="flex-shrink-0 bg-gray-900 p-2 flex items-center justify-center gap-2">
                 <button onClick={() => setActiveTab('creator')} className={`px-6 py-2 font-semibold transition ${activeTab === 'creator' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
@@ -727,6 +756,13 @@ const App = () => {
                 </button>
                  <button onClick={() => setActiveTab('ai_tools')} className={`px-6 py-2 font-semibold transition ${activeTab === 'ai_tools' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
                     AI Tools
+                </button>
+                <div className="flex-grow"></div>
+                <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition" aria-label="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                 </button>
             </nav>
             <div className="flex-grow min-h-0">
@@ -751,7 +787,7 @@ const App = () => {
                         isRefreshing={isRefreshing}
                         onAddDummyData={handleAddDummyData}
                         s3Available={s3Available}
-                        onConfigureS3={() => setIsS3ConfigModalOpen(true)}
+                        onOpenSettings={() => setIsSettingsModalOpen(true)}
                     />
                 )}
                  {activeTab === 'ai_tools' && (

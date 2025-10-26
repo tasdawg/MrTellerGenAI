@@ -36,7 +36,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
     const { idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative,
             variationCount, optimisedPrompt, generatedImages, isOptimising, isGenerating,
             error, copySuccess, subjectReferenceImage, styleReferenceImage, isGettingIdea, referenceUsage,
-            strictFaceLock, strictHairLock, s3Available, photorealisticSettings } = state;
+            strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured } = state;
     const { setIdea, setSubjectType, setStylePreset, setLighting, setCameraAngle, setQualityBoost,
             setAddNegative, setVariationCount, setOptimisedPrompt, setReferenceUsage,
             handleOptimizeClick, handleGenerateImage, handleCopyPrompt, handleSurpriseMe,
@@ -80,7 +80,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                         ) : (
                             <><input type="file" id="subject-image-upload" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={(e) => handleImageUpload(e, 'subject')} /><label htmlFor="subject-image-upload" className="w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 block">🖼️ Upload Subject</label></>
                         )}
-                         <button onClick={handleGetIdeaFromImage} disabled={!subjectReferenceImage || isGettingIdea} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                         <button onClick={handleGetIdeaFromImage} disabled={!isConfigured || !subjectReferenceImage || isGettingIdea} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                             {isGettingIdea ? <div className="spinner !w-5 !h-5"></div> : '💡'} Get Idea from Subject
                         </button>
                         {subjectReferenceImage && (
@@ -176,7 +176,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                         <h2 className="text-xl font-bold">1. Optimize Your Prompt</h2>
                         <p className="text-sm text-gray-400 mt-1">Adjust settings, upload a reference, or use "Surprise Me," then optimize.</p>
                     </div>
-                     <button onClick={handleOptimizeClick} disabled={isOptimising || !idea.trim()} className="w-full px-6 py-3 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300 flex items-center justify-center gap-2">
+                     <button onClick={handleOptimizeClick} disabled={!isConfigured || isOptimising || !idea.trim()} className="w-full px-6 py-3 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300 flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
                         Optimize Prompt
                      </button>
@@ -187,7 +187,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                             {isOptimising && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><div className="spinner !w-8 !h-8"></div></div>}
                         </div>
                          <div className="flex items-center gap-4 mt-3">
-                             <button onClick={handleGenerateImage} disabled={isGenerating || !optimisedPrompt} className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300">{generateButtonText}</button>
+                             <button onClick={handleGenerateImage} disabled={!isConfigured || isGenerating || !optimisedPrompt} className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300">{generateButtonText}</button>
                              <button onClick={handleCopyPrompt} className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300">{copySuccess ? 'Copied!' : '📋 Copy Prompt'}</button>
                              <div className="relative">
                                 <button
@@ -224,7 +224,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                  <div className="flex-grow bg-black/50 p-4 flex items-center justify-center min-h-0">
                     {error && <div className="text-center text-red-400 border border-red-500 p-4"><p className="font-bold">An Error Occurred</p><p>{error}</p></div>}
                     {!error && isGenerating && <Loader message="Generating & saving..."/>}
-                    {!error && !isGenerating && generatedImages.length === 0 && <div className="text-center text-gray-500">Your generated images will appear here.</div>}
+                    {!error && !isGenerating && generatedImages.length === 0 && <div className="text-center text-gray-500">{ isConfigured ? 'Your generated images will appear here.' : 'Please set your API Key in Settings to generate images.'}</div>}
                     {!error && !isGenerating && generatedImages.length > 0 && (
                         <div className={`grid gap-4 ${generatedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} w-full max-w-4xl`}>
                             {generatedImages.map((src, index) => (
