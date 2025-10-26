@@ -1,9 +1,9 @@
 // IMPORTANT: Storing credentials in client-side code is a major security risk.
 // These should be managed via a backend service and secure authentication method in a production environment.
 const S3_CONFIG = {
-    accessKeyId: 'lCEixOmQYBNv7X3eGanD',
-    secretAccessKey: 'VGvgJxlfpm3J4COaH0KDaFQyHHrQNaucs7OIUMKh',
-    endpoint: 'http://100.85.22.130:9000', // MiniIO S3 API endpoint
+    accessKeyId: '-',
+    secretAccessKey: '-',
+    endpoint: 'http://-:9000', // MiniIO S3 API endpoint
     bucketName: 'image-gen',
     region: 'us-east-1', // Default region, can be anything for MiniIO
     s3ForcePathStyle: true,
