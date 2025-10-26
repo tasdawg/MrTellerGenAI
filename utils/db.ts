@@ -25,12 +25,17 @@ export interface DecodedPrompt {
     aspectRatio: string;
 }
 
+export interface TemplatePrompt {
+    title: string;
+    prompt: string;
+}
+
 // --- NEW TYPES FOR COLLECTION ---
-export type CollectionItemContent = StoredImage | { prompt: string } | DecodedPrompt;
+export type CollectionItemContent = StoredImage | { prompt: string } | DecodedPrompt | TemplatePrompt;
 
 export interface CollectionItem {
     id: string;
-    type: 'image' | 'prompt' | 'decoded_prompt';
+    type: 'image' | 'prompt' | 'decoded_prompt' | 'template_prompt';
     timestamp: number;
     content: CollectionItemContent;
 }

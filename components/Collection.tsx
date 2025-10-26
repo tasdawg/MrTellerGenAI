@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 // Fix: Rename imported 'Collection' type to 'CollectionType' to avoid name collision with the component.
-import { Collection as CollectionType, CollectionItem, DecodedPrompt, StoredImage } from '../utils/db';
+import { Collection as CollectionType, CollectionItem, DecodedPrompt, StoredImage, TemplatePrompt } from '../utils/db';
 import { Loader } from './Loader';
 
 const CollectionItemCard = ({ item }: { item: CollectionItem }) => {
     const { type, content } = item;
+    const [isCopied, setIsCopied] = useState(false);
 
     if (type === 'image') {
         const imageContent = content as StoredImage;
@@ -49,6 +50,28 @@ const CollectionItemCard = ({ item }: { item: CollectionItem }) => {
                     <button disabled className="w-full text-xs bg-gray-700 text-white py-1 px-2 opacity-50 cursor-not-allowed">Move (N/A)</button>
                     <button disabled className="w-full text-xs bg-red-800 text-white py-1 px-2 opacity-50 cursor-not-allowed">Delete (N/A)</button>
                 </div>
+            </div>
+        );
+    }
+    
+    if (type === 'template_prompt') {
+        const templateContent = content as TemplatePrompt;
+
+        const handleCopy = () => {
+            navigator.clipboard.writeText(templateContent.prompt);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        };
+        
+        return (
+            <div className="bg-gray-800 p-3 h-40 flex flex-col justify-between border-l-2 border-gray-500">
+                <div className="overflow-hidden">
+                    <p className="font-bold text-sm text-white truncate">{templateContent.title}</p>
+                    <p className="text-xs text-gray-400 mt-2 text-ellipsis overflow-hidden h-16">{templateContent.prompt}</p>
+                </div>
+                <button onClick={handleCopy} className="w-full text-xs bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-2 transition mt-2">
+                    {isCopied ? 'Copied!' : '📋 Copy Prompt'}
+                </button>
             </div>
         );
     }

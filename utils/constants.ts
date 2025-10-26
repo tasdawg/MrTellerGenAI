@@ -1,8 +1,3 @@
-export const SUBJECT_TYPES = ["Person", "Product", "Animal", "Mythical Creature", "Robot", "Vehicle", "Food", "Building", "Landscape", "Abstract Concept"];
-export const STYLE_PRESETS = ["Realistic", "Cinematic", "Anime", "Pixar", "Claymation", "Low Poly", "Steampunk", "Studio Portrait", "Vaporwave", "Watercolor", "Cyberpunk", "LEGO", "Blueprint", "Vintage Photo", "Line Art"];
-export const LIGHTING_OPTIONS = ["Soft diffused", "Golden hour", "Hard shadow", "Neon", "Studio light", "Moonlight", "Backlit", "Dramatic", "Ambient Occlusion"];
-export const CAMERA_ANGLES = ["Front", "Side profile", "Overhead", "Low angle", "Wide", "Dutch Angle", "Macro", "First-person POV"];
-export const VARIATION_COUNTS = [1, 2, 4];
 export const REFERENCE_USAGE_OPTIONS = ["Use as Subject", "Use as Style", "Edit with Prompt"];
 export const ASPECT_RATIOS = ["16:9", "9:16", "4:3", "3:4"];
 
@@ -46,20 +41,6 @@ export const SHOT_POSES = [
     { name: "9. Profile with Water Droplet", value: "intense close-up of profile with single tear-like water droplet, cinematic light slice across (85mm, f/ 1.9)" }
 ];
 
-export const QUICK_CHIPS = [
-    { name: "Studio Portrait", settings: { subject_type: "Person", style_preset: "Studio Portrait", lighting: "Soft diffused", camera_angle: "Front" } },
-    { name: "Ad-Ready Product", settings: { subject_type: "Product", style_preset: "Realistic", lighting: "Studio light", camera_angle: "Front" } },
-    { name: "Cinematic Scene", settings: { subject_type: "Landscape", style_preset: "Cinematic", lighting: "Golden hour", camera_angle: "Low angle" } },
-];
-
-export const SURPRISE_IDEAS = [
-    "a robot librarian in a futuristic library",
-    "a cat wearing tiny glasses reading a book",
-    "a floating island with a waterfall cascading into the clouds",
-    "an astronaut discovering a glowing forest on a distant planet",
-    "a vintage car driving on a rainbow road",
-];
-
 export const REVERSE_ENGINEER_EXAMPLES = `
 --- EXAMPLE 1 ---
 Change this photo to Wong Kar-wai's inspired cinematic triptych of a young girl in the city at night, bathed in moody neon green, amber, and red lights. Film grain, dreamy haze, and soft blur with saturated colors. parted to the side with strands falling across his forehead, giving a slightly disheveled, romantic look. Using the outfit as in the second photo, keeping the original face.
@@ -68,7 +49,7 @@ Middle Panel: She takes a slow sip from a canned beer bottle, her gaze unfocused
 Bottom Panel: She stands alone on a pedestrian overpass bridge at night, hair waving in the wind, head tilted back toward the sky, expression weary and melancholic, blurred crowded people's headlights in the distance. Shallow depth of field, intimate close-up framing, nostalgic atmosphere.
 
 --- EXAMPLE 2 ---
-A cinematic black-and-white portrait of your uploaded female subject, rendered in ultra-realistic detail with glossy film contrast and fine grain. Her long, voluminous curls cascade forward, a few locks falling across one eye to heighten the mysterious, seductive tone. Her gaze is magnetic and confident, lips gently parted, evoking quiet sensuality. She wears a light, soft-textured shirt with the top few buttons undone, the neckline open wider at the front to reveal graceful collarbones and create an effortlessly alluring silhouette. The sleeves are rolled up to mid-forearm, adding a relaxed yet confident energy, like a behind-the-scenes fashion editorial moment. Her hands rest near her face, fingers elegantly intertwined, adorned with multiple luxurious rings - a mix of bold designer pieces and fine bands that shimmer subtly under the studio lighting. The background is minimalist and softly blurred, directing all attention to her expression, the shirt's open neckline, and her sparkling jewelry. Rembrandt-style lighting cuts diagonally across her cheek and chest, creating rich highlights and sculpted shadows that emphasize texture and tone. The composition feels Vogue-editorial, sensual, and cinematic, balancing sophistication with bold confidence. Camera details: 85 mm f/1.4 full-frame DSLR, shallow depth of field, crisp focus on her eyes, curls, and jewelry; natural monochrome film grain; vertical 9:16 aspect ratio.
+A cinematic black-and-white portrait of your uploaded female subject, rendered in ultra-realistic detail with glossy film contrast and fine grain. Her long, voluminous curls cascade forward, a few locks falling across one eye to heighten the mysterious, seductive tone. Her gaze is magnetic and confident, lips gently parted, evoking quiet sensuality. She wears a light, soft-textured shirt with the top few buttons undone, the neckline open wider at the front to reveal graceful collarbones and create an effortlessly alluring silhouette. The sleeves are rolled up to mid-form, adding a relaxed yet confident energy, like a behind-the-scenes fashion editorial moment. Her hands rest near her face, fingers elegantly intertwined, adorned with multiple luxurious rings - a mix of bold designer pieces and fine bands that shimmer subtly under the studio lighting. The background is minimalist and softly blurred, directing all attention to her expression, the shirt's open neckline, and her sparkling jewelry. Rembrandt-style lighting cuts diagonally across her cheek and chest, creating rich highlights and sculpted shadows that emphasize texture and tone. The composition feels Vogue-editorial, sensual, and cinematic, balancing sophistication with bold confidence. Camera details: 85 mm f/1.4 full-frame DSLR, shallow depth of field, crisp focus on her eyes, curls, and jewelry; natural monochrome film grain; vertical 9:16 aspect ratio.
 
 --- EXAMPLE 3 ---
 A tall, elegant woman with a C-cup bust, long straight dark brown hair, and a sharp, defined nose. She wears a cream-colored off-shoulder dress with multiple flowing ruffles and tattered edges, reminiscent of a ghostly, haunted costume. The low-cut bodice accentuates her figure, while the off-shoulder design adds elegance and drama. A sheer, translucent cream-colored fabric softly covers her eyes. She poses hugging herself gently, slightly bowing her head, looking down at one shoulder, fingers long and delicate with perfectly manicured nails. The background is dark with deep red and black tones, filled with thin, ethereal fog, subtle floating embers, and flickering candlelight effects. Warm, dramatic studio lighting and rim light highlight her figure, creating intense shadows and depth, enhancing the eerie and mystical mood. Highly realistic skin texture, natural hair flow, realistic fabric folds, cinematic depth of field, ultra photorealistic, DSLR-style fashion photography, dark dreamy, gothic, moody, ethereal, perfect for Halloween editorial.

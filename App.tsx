@@ -1,15 +1,9 @@
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt } from './utils/db';
+import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt } from './utils/db';
 import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
 import { CONFIG } from './utils/config';
-import { SUBJECT_TYPES, STYLE_PRESETS, LIGHTING_OPTIONS, CAMERA_ANGLES, VARIATION_COUNTS, REFERENCE_USAGE_OPTIONS, SURPRISE_IDEAS, QUICK_CHIPS, DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, REVERSE_ENGINEER_EXAMPLES } from './utils/constants';
+import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, REVERSE_ENGINEER_EXAMPLES } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
@@ -46,6 +40,34 @@ After applying this, refresh the page.
     return errorMessage;
 };
 
+const parseTemplatePrompts = (): CollectionFolder => {
+    const templateItems: CollectionItem[] = [];
+    // Split by '---' and remove the first empty element if the string starts with it
+    const examples = REVERSE_ENGINEER_EXAMPLES.split('---').filter(s => s.trim().startsWith('EXAMPLE'));
+    
+    examples.forEach((example, index) => {
+        const lines = example.trim().split('\n');
+        const title = lines[0].replace('EXAMPLE ', '').replace(' ---', '').trim();
+        const prompt = lines.slice(1).join('\n').trim();
+
+        templateItems.push({
+            id: `template-${index}`,
+            type: 'template_prompt',
+            timestamp: Date.now() - index, // ensure stable order
+            content: {
+                title: `AI Template: ${title}`,
+                prompt: prompt,
+            } as TemplatePrompt
+        });
+    });
+
+    return {
+        id: 'ai-prompt-templates',
+        name: 'AI Prompt Templates',
+        items: templateItems,
+    };
+};
+
 
 const App = () => {
     // --- State Management ---
@@ -66,18 +88,8 @@ const App = () => {
     const [ai, setAi] = useState<GoogleGenAI | null>(null);
     const [apiKey, setApiKey] = useState('');
 
-    const [idea, setIdea] = useState(initialCreatorState?.idea ?? "a dog surfing at sunset");
-    const [subjectType, setSubjectType] = useState(initialCreatorState?.subjectType ?? SUBJECT_TYPES[2]);
-    const [stylePreset, setStylePreset] = useState(initialCreatorState?.stylePreset ?? STYLE_PRESETS[0]);
-    const [lighting, setLighting] = useState(initialCreatorState?.lighting ?? LIGHTING_OPTIONS[1]);
-    const [cameraAngle, setCameraAngle] = useState(initialCreatorState?.cameraAngle ?? CAMERA_ANGLES[4]);
-    const [qualityBoost, setQualityBoost] = useState(initialCreatorState?.qualityBoost ?? true);
-    const [addNegative, setAddNegative] = useState(initialCreatorState?.addNegative ?? true);
-    const [variationCount, setVariationCount] = useState(initialCreatorState?.variationCount ?? VARIATION_COUNTS[0]);
-    
-    const [optimisedPrompt, setOptimisedPrompt] = useState(initialCreatorState?.optimisedPrompt ?? '');
+    const [generatedPrompt, setGeneratedPrompt] = useState(initialCreatorState?.generatedPrompt ?? '');
     const [generatedImages, setGeneratedImages] = useState<string[]>([]); // Don't persist generated images
-    const [isOptimising, setIsOptimising] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState(false);
@@ -85,10 +97,7 @@ const App = () => {
     // Reference Image State
     const [subjectReferenceImage, setSubjectReferenceImage] = useState(initialCreatorState?.subjectReferenceImage ?? null);
     const [subjectReferenceImageMimeType, setSubjectReferenceImageMimeType] = useState(initialCreatorState?.subjectReferenceImageMimeType ?? '');
-    const [styleReferenceImage, setStyleReferenceImage] = useState(initialCreatorState?.styleReferenceImage ?? null);
-    const [styleReferenceImageMimeType, setStyleReferenceImageMimeType] = useState(initialCreatorState?.styleReferenceImageMimeType ?? '');
     const [isGettingIdea, setIsGettingIdea] = useState(false);
-    const [referenceUsage, setReferenceUsage] = useState(initialCreatorState?.referenceUsage ?? REFERENCE_USAGE_OPTIONS[0]);
     const [strictFaceLock, setStrictFaceLock] = useState(initialCreatorState?.strictFaceLock ?? true);
     const [strictHairLock, setStrictHairLock] = useState(initialCreatorState?.strictHairLock ?? true);
 
@@ -206,6 +215,10 @@ const App = () => {
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
         setError(null);
+
+        const templateFolder = parseTemplatePrompts();
+        let s3Folders: CollectionFolder[] = [];
+
         try {
             const objects = await listFromS3();
             const allItems: CollectionItem[] = [];
@@ -250,19 +263,18 @@ const App = () => {
 
             allItems.sort((a, b) => b.timestamp - a.timestamp);
             
-            // For now, load everything into a single collection folder
             // Update savedImages for the gallery tab
             const galleryImages = allItems
                 .filter(item => item.type === 'image')
                 .map(item => item.content as StoredImage);
             setSavedImages(galleryImages);
             
-            const s3Folder: CollectionFolder = {
+            s3Folders.push({
                 id: 's3-bucket-main',
                 name: 'S3 Bucket',
                 items: allItems
-            };
-            setCollection({ folders: [s3Folder] });
+            });
+
             setS3Available(true); // Connection is OK
 
         } catch (e: any) {
@@ -274,8 +286,8 @@ const App = () => {
                 return false;
             });
             setSavedImages([]); // Clear any S3-based images
-            setCollection({ folders: [] }); // Clear S3-based collection
         } finally {
+            setCollection({ folders: [templateFolder, ...s3Folders] });
             setIsRefreshing(false);
         }
     }, []);
@@ -292,10 +304,8 @@ const App = () => {
     // Save creator state to localStorage whenever it changes
     useEffect(() => {
         const creatorStateToSave = {
-            idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative,
-            variationCount, optimisedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
-            styleReferenceImage, styleReferenceImageMimeType, referenceUsage, strictFaceLock, strictHairLock,
-            photorealisticSettings
+            generatedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
+            strictFaceLock, strictHairLock, photorealisticSettings
         };
         try {
             localStorage.setItem('gemini-creator-state', JSON.stringify(creatorStateToSave));
@@ -303,53 +313,13 @@ const App = () => {
             console.error("Could not save creator state to localStorage", error);
         }
     }, [
-        idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative,
-        variationCount, optimisedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
-        styleReferenceImage, styleReferenceImageMimeType, referenceUsage, strictFaceLock, strictHairLock,
+        generatedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
+        strictFaceLock, strictHairLock,
         photorealisticSettings
     ]);
 
-    const optimizePrompt = useCallback(async (currentSettings: any) => {
-        if (!ai) return;
-        setIsOptimising(true);
-        setError(null);
-        const qualityBoostText = currentSettings.qualityBoost ? "high detail, sharp focus, ultra-realistic, intricate textures" : "";
-        const negativeText = currentSettings.addNegative ? "blurry, distorted, extra limbs, multiple faces, text, watermark, cropped, low quality, bad hands" : "";
-        const promptTemplate = `
-            You are an expert image prompt formatter.
-            Take the user's rough idea and build a clean, high-performing prompt.
-            USER IDEA: ${currentSettings.idea}
-            Subject type: ${currentSettings.subjectType}
-            Style: ${currentSettings.stylePreset}
-            Lighting: ${currentSettings.lighting}
-            Camera angle: ${currentSettings.cameraAngle}
-            ${qualityBoostText ? `Quality Boosters: ${qualityBoostText}` : ""}
-            ${negativeText ? `Negative prompt hints: ${negativeText}`: ""}
-            Rules: Keep it 1–3 sentences max. Include subject framing, style, lighting, and camera angle. Make it sound natural. Avoid repetition. Output ONLY the final optimised prompt text.
-        `;
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: promptTemplate,
-            });
-            setOptimisedPrompt(response.text.trim());
-        } catch (e) {
-            setError("Failed to optimize prompt.");
-            console.error(e);
-        } finally {
-            setIsOptimising(false);
-        }
-    }, [ai]);
-
-    const handleOptimizeClick = () => {
-        if (idea.trim()) {
-            const currentSettings = { idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative };
-            optimizePrompt(currentSettings);
-        }
-    };
-
     const handleGenerateImage = async () => {
-        if (!ai || !optimisedPrompt) return;
+        if (!ai || !generatedPrompt) return;
         setIsGenerating(true);
         setGeneratedImages([]);
         setError(null);
@@ -359,8 +329,8 @@ const App = () => {
                 const newStoredImages: StoredImage[] = imageSrcs.map(src => ({
                     id: crypto.randomUUID(),
                     src: src, // The base64 data URL
-                    prompt: optimisedPrompt,
-                    settings: { subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative },
+                    prompt: generatedPrompt,
+                    settings: { photorealisticSettings },
                     timestamp: Date.now(),
                 }));
                 setSavedImages(prevImages => [...newStoredImages, ...prevImages]);
@@ -378,8 +348,8 @@ const App = () => {
                     const jsonKey = `prompt-${uuid}.json`;
                     const imageBlob = base64ToBlob(src, 'image/jpeg');
                     const jsonData = {
-                        prompt: optimisedPrompt,
-                        settings: { subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative },
+                        prompt: generatedPrompt,
+                        settings: { photorealisticSettings },
                         timestamp: Date.now(),
                     };
                     const jsonString = JSON.stringify(jsonData, null, 2);
@@ -398,69 +368,25 @@ const App = () => {
         };
         
         const hasSubject = !!subjectReferenceImage;
-        const hasStyle = !!styleReferenceImage;
-
+       
         try {
             let fidelityInstructions = '';
             if (hasSubject) {
                 if (strictFaceLock) {
-                    fidelityInstructions += " The face of the subject MUST be an exact, photorealistic match to the reference image (or first image, if two are provided). Do not alter the facial features, structure, or identity.";
+                    fidelityInstructions += " The face of the subject MUST be an exact, photorealistic match to the reference image. Do not alter the facial features, structure, or identity.";
                 }
                 if (strictHairLock) {
-                    fidelityInstructions += " The hair color, length, and style of the subject MUST match the reference image (or first image, if two are provided) exactly.";
+                    fidelityInstructions += " The hair color, length, and style of the subject MUST match the reference image exactly.";
                 }
             }
+            
+            const instructionText = generatedPrompt + fidelityInstructions;
 
-            if (hasSubject && hasStyle) {
-                // Case 1: Subject and Style reference images
-                const subjectBase64 = subjectReferenceImage.split(',')[1];
-                const styleBase64 = styleReferenceImage.split(',')[1];
-                
-                const subjectPart = { inlineData: { data: subjectBase64, mimeType: subjectReferenceImageMimeType } };
-                const stylePart = { inlineData: { data: styleBase64, mimeType: styleReferenceImageMimeType } };
-                const baseText = `Use the first image as the subject reference. Use the second image as the style reference. Recreate the subject from the first image in the artistic style of the second image. The new image should also incorporate the following text description: "${optimisedPrompt}"`;
-                const textPart = { text: baseText + fidelityInstructions };
-
+            if (hasSubject) {
+                const base64Data = subjectReferenceImage.split(',')[1];
                 const response = await ai.models.generateContent({
                     model: 'gemini-2.5-flash-image',
-                    contents: { parts: [subjectPart, stylePart, textPart] },
-                    config: { responseModalities: [Modality.IMAGE] },
-                });
-                const imageParts = response.candidates[0].content.parts.filter(part => part.inlineData);
-                if (imageParts.length > 0) {
-                    const images = imageParts.map(part => `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`);
-                    setGeneratedImages(images);
-                    await uploadOrSaveImages(images);
-                } else {
-                    setError("The model did not return an image. It might have refused the request. Please try a different prompt or image.");
-                }
-
-            } else if (hasSubject || hasStyle) {
-                // Case 2: Only one reference image
-                const referenceImage = hasSubject ? subjectReferenceImage : styleReferenceImage;
-                const referenceImageMimeType = hasSubject ? subjectReferenceImageMimeType : styleReferenceImageMimeType;
-                
-                const base64Data = referenceImage.split(',')[1];
-                let instructionText = '';
-                // If only style image is provided, default usage to 'Use as Style' if it's 'Use as Subject'
-                const currentUsage = (hasStyle && referenceUsage === 'Use as Subject') ? 'Use as Style' : referenceUsage;
-
-                switch(currentUsage) {
-                    case 'Use as Subject':
-                        instructionText = `Take the main subject from the provided image. Create a new image of that same subject but place it in the scene described here: "${optimisedPrompt}". The new image should not use the background or style of the reference image unless specified in the description.` + fidelityInstructions;
-                        break;
-                    case 'Use as Style':
-                        instructionText = `Analyze the artistic style, color palette, and lighting of the provided image. Apply this exact style to a new image depicting the following scene: "${optimisedPrompt}". The subject of the new image should be what's in the text description, not the reference image.`;
-                        break;
-                    case 'Edit with Prompt':
-                        instructionText = `Use the provided image as a base. Edit it according to the following instruction: "${optimisedPrompt}".` + fidelityInstructions;
-                        break;
-                    default:
-                        instructionText = optimisedPrompt;
-                }
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash-image',
-                    contents: { parts: [{ inlineData: { data: base64Data, mimeType: referenceImageMimeType } }, { text: instructionText }] },
+                    contents: { parts: [{ inlineData: { data: base64Data, mimeType: subjectReferenceImageMimeType } }, { text: instructionText }] },
                     config: { responseModalities: [Modality.IMAGE] },
                 });
                 const imageParts = response.candidates[0].content.parts.filter(part => part.inlineData);
@@ -472,11 +398,11 @@ const App = () => {
                     setError("The model did not return an image. It might have refused the request. Please try a different prompt or image.");
                 }
             } else {
-                // Case 3: No reference images
+                // Case for no reference image, using Imagen
                 const response = await ai.models.generateImages({
                     model: 'imagen-4.0-generate-001',
-                    prompt: optimisedPrompt,
-                    config: { numberOfImages: variationCount, aspectRatio: '1:1' },
+                    prompt: generatedPrompt,
+                    config: { numberOfImages: 1, aspectRatio: photorealisticSettings.aspectRatio === '9:16' ? '9:16' : '1:1' },
                 });
                 const images = response.generatedImages.map(img => `data:image/png;base64,${img.image.imageBytes}`);
                 setGeneratedImages(images);
@@ -491,38 +417,20 @@ const App = () => {
     };
 
     const handleCopyPrompt = () => {
-        navigator.clipboard.writeText(optimisedPrompt).then(() => {
+        navigator.clipboard.writeText(generatedPrompt).then(() => {
             setCopySuccess(true);
             setTimeout(() => setCopySuccess(false), 2000);
         });
     };
     
-    const handleSurpriseMe = () => {
-        const randomIdea = SURPRISE_IDEAS[Math.floor(Math.random() * SURPRISE_IDEAS.length)];
-        setIdea(randomIdea);
-    };
-
-    const handleQuickChip = (settings: any) => {
-        setSubjectType(settings.subject_type);
-        setStylePreset(settings.style_preset);
-        setLighting(settings.lighting);
-        setCameraAngle(settings.camera_angle);
-    };
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'subject' | 'style') => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && file.type.startsWith('image/')) {
             setError(null);
             const reader = new FileReader();
             reader.onloadend = () => {
-                if (type === 'subject') {
-                    setSubjectReferenceImage(reader.result as string);
-                    setSubjectReferenceImageMimeType(file.type);
-                } else { // type === 'style'
-                    setStyleReferenceImage(reader.result as string);
-                    setStyleReferenceImageMimeType(file.type);
-                }
-                setVariationCount(1);
+                setSubjectReferenceImage(reader.result as string);
+                setSubjectReferenceImageMimeType(file.type);
             };
             reader.readAsDataURL(file);
         } else {
@@ -531,21 +439,16 @@ const App = () => {
         e.target.value = ''; // Allow re-uploading the same file
     };
 
-    const handleRemoveImage = (type: 'subject' | 'style') => {
-        if (type === 'subject') {
-            setSubjectReferenceImage(null);
-            setSubjectReferenceImageMimeType('');
-        } else { // type === 'style'
-            setStyleReferenceImage(null);
-            setStyleReferenceImageMimeType('');
-        }
+    const handleRemoveImage = () => {
+        setSubjectReferenceImage(null);
+        setSubjectReferenceImageMimeType('');
     };
 
     const handleGetIdeaFromImage = useCallback(async () => {
         if (!ai || !subjectReferenceImage) return;
         setIsGettingIdea(true);
         setError(null);
-        setIdea('');
+        
         try {
             const base64Data = subjectReferenceImage.split(',')[1];
             const imagePart = { inlineData: { mimeType: subjectReferenceImageMimeType, data: base64Data } };
@@ -554,7 +457,13 @@ const App = () => {
                 model: 'gemini-2.5-flash',
                 contents: { parts: [imagePart, textPart] },
             });
-            setIdea(response.text.trim());
+            // This now feeds into the AI Tools -> Reverse Engineer prompt
+            setReverseEngineeredPrompt(response.text.trim());
+            setActiveTab('ai_tools');
+            // Maybe set the reverse engineer image as well?
+            setReverseEngineerImage(subjectReferenceImage);
+            setReverseEngineerImageMimeType(subjectReferenceImageMimeType);
+
         } catch (e) {
             setError("Failed to get idea from image.");
             console.error(e);
@@ -564,17 +473,11 @@ const App = () => {
     }, [ai, subjectReferenceImage, subjectReferenceImageMimeType]);
 
     // --- Gallery Handlers ---
-    const handleUseAsReference = (image: StoredImage, type: 'subject' | 'style' = 'subject') => {
+    const handleUseAsReference = (image: StoredImage) => {
         // Since image.src could be a public URL or base64, we handle both
         const processImageSrc = (src: string, mime: string) => {
-             if (type === 'subject') {
-                setSubjectReferenceImage(src);
-                setSubjectReferenceImageMimeType(mime);
-            } else { // 'style'
-                setStyleReferenceImage(src);
-                setStyleReferenceImageMimeType(mime);
-            }
-            setVariationCount(1);
+            setSubjectReferenceImage(src);
+            setSubjectReferenceImageMimeType(mime);
             setActiveTab('creator');
         };
 
@@ -599,15 +502,11 @@ const App = () => {
     };
 
     const handleUseSettings = (image: StoredImage) => {
-        setIdea(image.prompt);
         const { settings } = image;
-        setSubjectType(settings.subjectType);
-        setStylePreset(settings.stylePreset);
-        setLighting(settings.lighting);
-        setCameraAngle(settings.cameraAngle);
-        setQualityBoost(settings.qualityBoost);
-        setAddNegative(settings.addNegative);
-        setOptimisedPrompt(image.prompt);
+        if (settings.photorealisticSettings) {
+            setPhotorealisticSettings(settings.photorealisticSettings);
+        }
+        setGeneratedPrompt(image.prompt);
         setActiveTab('creator');
     };
     
@@ -735,7 +634,7 @@ const App = () => {
     const handleApplyReverseEngineeredPrompt = () => {
         if (!reverseEngineeredPrompt || !reverseEngineerImage) return;
         // Set the prompt in the creator
-        setOptimisedPrompt(reverseEngineeredPrompt);
+        setGeneratedPrompt(reverseEngineeredPrompt);
         // Set the image as a subject reference in the creator
         setSubjectReferenceImage(reverseEngineerImage);
         setSubjectReferenceImageMimeType(reverseEngineerImageMimeType);
@@ -753,8 +652,8 @@ const App = () => {
         setError(null);
         try {
             const dummyItems = [
-                { prompt: 'A majestic lion with a crown of stars', settings: { subjectType: 'Animal', stylePreset: 'Cinematic', lighting: 'Golden hour', cameraAngle: 'Low angle', qualityBoost: true, addNegative: true } },
-                { prompt: 'A futuristic cityscape at night with flying cars', settings: { subjectType: 'Landscape', stylePreset: 'Cyberpunk', lighting: 'Neon', cameraAngle: 'Wide', qualityBoost: true, addNegative: true } },
+                { prompt: 'A majestic lion with a crown of stars', settings: { photorealisticSettings: { ...photorealisticSettings, action: 'staring majestically' } } },
+                { prompt: 'A futuristic cityscape at night with flying cars', settings: { photorealisticSettings: { ...photorealisticSettings, background: 'Modern City Street', backgroundElements: 'Neon-lit cyberpunk alleyway' } } },
             ];
             // A tiny 1x1 black pixel GIF
             const placeholderImg = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
@@ -785,8 +684,8 @@ const App = () => {
     };
 
     // --- Props for children ---
-    const creatorState = { idea, subjectType, stylePreset, lighting, cameraAngle, qualityBoost, addNegative, variationCount, optimisedPrompt, generatedImages, isOptimising, isGenerating, error, copySuccess, subjectReferenceImage, styleReferenceImage, isGettingIdea, referenceUsage, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
-    const creatorHandlers = { setIdea, setSubjectType, setStylePreset, setLighting, setCameraAngle, setQualityBoost, setAddNegative, setVariationCount, setOptimisedPrompt, setReferenceUsage, handleOptimizeClick, handleGenerateImage, handleCopyPrompt, handleSurpriseMe, handleQuickChip, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings };
+    const creatorState = { generatedPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
+    const creatorHandlers = { setGeneratedPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings };
     const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
     const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt };
 
