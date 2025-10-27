@@ -5,7 +5,7 @@ import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt, ReverseEngineeredPrompt } from './utils/db';
 import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
 import { CONFIG } from './utils/config';
-import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES } from './utils/constants';
+import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, CLOTHING_DETAILS_MAP, HAIR_STYLES, HAIR_ACCESSORIES, SKIN_DETAILS, FASHION_AESTHETICS } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
@@ -87,7 +87,12 @@ const App = () => {
     const [ai, setAi] = useState<GoogleGenAI | null>(null);
     const [apiKey, setApiKey] = useState('');
 
-    const [generatedPrompt, setGeneratedPrompt] = useState(initialCreatorState?.generatedPrompt ?? '');
+    // --- PROMPT STATE REFACTORED ---
+    const [userPrompt, setUserPrompt] = useState(initialCreatorState?.userPrompt ?? '');
+    const [studioPrompt, setStudioPrompt] = useState(''); // Always generated, never saved
+    const [useStudioPrompt, setUseStudioPrompt] = useState(initialCreatorState?.useStudioPrompt ?? true);
+    // --- END REFACTOR ---
+
     const [generatedImages, setGeneratedImages] = useState<string[]>([]); // Don't persist generated images
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -125,9 +130,9 @@ const App = () => {
     const [photorealisticSettings, setPhotorealisticSettings] = useState(initialCreatorState?.photorealisticSettings ?? {
         dressStyle: DRESS_STYLES[0],
         dressColor: 'red',
-        dressDetails: 'lightweight, flowing, hem and sleeves are long and drape to the floor',
-        hairStyle: 'long and loose, with a few strands falling around her face',
-        hairAccessory: 'long, flowing red fabric hair accessory',
+        dressDetails: CLOTHING_DETAILS_MAP[DRESS_STYLES[0]][0],
+        hairStyle: HAIR_STYLES[0],
+        hairAccessory: HAIR_ACCESSORIES[1], // Default to an accessory, not 'None'
         background: BACKGROUND_SETTINGS[0],
         backgroundElements: BACKGROUND_ELEMENTS_PRESETS[0],
         action: 'running away from something',
@@ -136,11 +141,10 @@ const App = () => {
         shotPose: SHOT_POSES[0].value,
         cameraModel: CAMERA_MODELS[0],
         lensType: LENS_TYPES[0],
-        skin: 'Glowing porcelain skin',
-        fashionAesthetics: 'Meticulously detailed fashion aesthetics',
+        skin: SKIN_DETAILS[0],
+        fashionAesthetics: FASHION_AESTHETICS[0],
         aspectRatio: '9:16',
     });
-    const [isPromptOverridden, setIsPromptOverridden] = useState(initialCreatorState?.isPromptOverridden ?? false);
 
 
     // S3 & Settings State
@@ -319,8 +323,13 @@ const App = () => {
     // Save creator state to localStorage whenever it changes
     useEffect(() => {
         const creatorStateToSave = {
-            generatedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
-            strictFaceLock, strictHairLock, photorealisticSettings, isPromptOverridden
+            userPrompt,
+            useStudioPrompt,
+            subjectReferenceImage,
+            subjectReferenceImageMimeType,
+            strictFaceLock,
+            strictHairLock,
+            photorealisticSettings,
         };
         try {
             localStorage.setItem('gemini-creator-state', JSON.stringify(creatorStateToSave));
@@ -328,9 +337,10 @@ const App = () => {
             console.error("Could not save creator state to localStorage", error);
         }
     }, [
-        generatedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
+        userPrompt, useStudioPrompt,
+        subjectReferenceImage, subjectReferenceImageMimeType,
         strictFaceLock, strictHairLock,
-        photorealisticSettings, isPromptOverridden
+        photorealisticSettings
     ]);
 
     // --- COLLECTION BUILDING ---
@@ -374,10 +384,6 @@ const App = () => {
 
     // --- AUTOMATIC PROMPT GENERATION ---
     useEffect(() => {
-        if (isPromptOverridden) {
-            return; // Don't auto-generate if the prompt is manually set
-        }
-
         const basePrompt = generatePhotorealisticPrompt(photorealisticSettings);
         
         let fidelityInstructions = '';
@@ -392,18 +398,19 @@ const App = () => {
         }
         
         const finalPrompt = fidelityInstructions + basePrompt;
-        setGeneratedPrompt(finalPrompt);
+        setStudioPrompt(finalPrompt);
 
     }, [
         photorealisticSettings, 
         strictFaceLock, 
         strictHairLock, 
-        subjectReferenceImage, 
-        isPromptOverridden
+        subjectReferenceImage
     ]);
 
     const handleGenerateImage = async () => {
-        if (!ai || !generatedPrompt) return;
+        const promptToUse = useStudioPrompt ? studioPrompt : userPrompt;
+        if (!ai || !promptToUse) return;
+        
         setIsGenerating(true);
         setGeneratedImages([]);
         setError(null);
@@ -413,7 +420,7 @@ const App = () => {
                 const newStoredImages: StoredImage[] = imageSrcs.map(src => ({
                     id: crypto.randomUUID(),
                     src: src, // The base64 data URL
-                    prompt: generatedPrompt,
+                    prompt: promptToUse,
                     settings: { photorealisticSettings },
                     timestamp: Date.now(),
                 }));
@@ -432,7 +439,7 @@ const App = () => {
                     const jsonKey = `prompt-${uuid}.json`;
                     const imageBlob = base64ToBlob(src, 'image/jpeg');
                     const jsonData = {
-                        prompt: generatedPrompt,
+                        prompt: promptToUse,
                         settings: { photorealisticSettings },
                         timestamp: Date.now(),
                     };
@@ -454,7 +461,7 @@ const App = () => {
         const hasSubject = !!subjectReferenceImage;
        
         try {
-            const instructionText = generatedPrompt;
+            const instructionText = promptToUse;
 
             if (hasSubject) {
                 const base64Data = subjectReferenceImage.split(',')[1];
@@ -491,7 +498,8 @@ const App = () => {
     };
 
     const handleCopyPrompt = () => {
-        navigator.clipboard.writeText(generatedPrompt).then(() => {
+        const promptToCopy = useStudioPrompt ? studioPrompt : userPrompt;
+        navigator.clipboard.writeText(promptToCopy).then(() => {
             setCopySuccess(true);
             setTimeout(() => setCopySuccess(false), 2000);
         });
@@ -580,7 +588,8 @@ const App = () => {
         if (settings.photorealisticSettings) {
             handlePhotorealisticSettingsChange(settings.photorealisticSettings);
         }
-        setGeneratedPrompt(image.prompt);
+        setUserPrompt(image.prompt);
+        setUseStudioPrompt(false);
         setActiveTab('creator');
     };
     
@@ -664,13 +673,13 @@ const App = () => {
     
     const handlePhotorealisticSettingsChange = (newSettings: DecodedPrompt) => {
         setPhotorealisticSettings(newSettings);
-        setIsPromptOverridden(false);
     };
 
     const handleApplyDecodedPrompt = (decoded: DecodedPrompt) => {
         if (!decoded) return;
         handlePhotorealisticSettingsChange(decoded);
         setActiveTab('creator');
+        setUseStudioPrompt(true);
     };
 
     const handleReverseEngineerPrompt = useCallback(async () => {
@@ -738,12 +747,12 @@ const App = () => {
     const handleApplyReverseEngineeredPrompt = () => {
         if (!reverseEngineeredPrompt || !reverseEngineerImage) return;
         // Set the prompt in the creator
-        setGeneratedPrompt(reverseEngineeredPrompt);
+        setUserPrompt(reverseEngineeredPrompt);
         // Set the image as a subject reference in the creator
         setSubjectReferenceImage(reverseEngineerImage);
         setSubjectReferenceImageMimeType(reverseEngineerImageMimeType);
         // Set the override flag to prevent the Creator's useEffect from overwriting the prompt
-        setIsPromptOverridden(true);
+        setUseStudioPrompt(false);
         // Switch to the creator tab
         setActiveTab('creator');
     };
@@ -809,8 +818,8 @@ const App = () => {
     };
 
     // --- Props for children ---
-    const creatorState = { generatedPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai, isPromptOverridden };
-    const creatorHandlers = { setGeneratedPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange };
+    const creatorState = { userPrompt, studioPrompt, useStudioPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
+    const creatorHandlers = { setUserPrompt, setUseStudioPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange };
     const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
     const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt, handleSaveReverseEngineeredPrompt };
 

@@ -3,17 +3,21 @@ import { Loader } from './Loader';
 import { ToggleSwitch } from './ToggleSwitch';
 import { CollapsibleSection } from './CollapsibleSection';
 import { PhotorealisticSection } from './PhotorealisticSection';
-import { renderFormControl } from '../utils/ui';
 import { Collection } from '../utils/db';
 
 export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: any, handlers: any, collection: Collection, onSavePrompt: (prompt: string, folderId: string) => void }) => {
-    const { generatedPrompt, generatedImages, isGenerating,
-            error, copySuccess, subjectReferenceImage, isGettingIdea,
-            strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured } = state;
-    const { setGeneratedPrompt,
-            handleGenerateImage, handleCopyPrompt,
-            handleImageUpload, handleRemoveImage, handleGetIdeaFromImage,
-            setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings } = handlers;
+    const {
+        userPrompt, studioPrompt, useStudioPrompt,
+        generatedImages, isGenerating,
+        error, copySuccess, subjectReferenceImage, isGettingIdea,
+        strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured
+    } = state;
+    const {
+        setUserPrompt, setUseStudioPrompt,
+        handleGenerateImage, handleCopyPrompt,
+        handleImageUpload, handleRemoveImage, handleGetIdeaFromImage,
+        setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings
+    } = handlers;
     
     const [showSavePromptOptions, setShowSavePromptOptions] = React.useState(false);
     const [enlargedImageSrc, setEnlargedImageSrc] = React.useState<string | null>(null);
@@ -22,6 +26,8 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
     if (subjectReferenceImage) {
         generateButtonText = '🎨 Generate with Reference';
     }
+
+    const activePrompt = useStudioPrompt ? studioPrompt : userPrompt;
             
     return (
         <React.Fragment>
@@ -40,7 +46,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                                     </button>
                                 </div>
                             ) : (
-                                <><input type="file" id="subject-image-upload" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={(e) => handleImageUpload(e, 'subject')} /><label htmlFor="subject-image-upload" className="w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 block">🖼️ Upload Subject</label></>
+                                <><input type="file" id="subject-image-upload" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handleImageUpload} /><label htmlFor="subject-image-upload" className="w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 block">🖼️ Upload Subject</label></>
                             )}
                              <button onClick={handleGetIdeaFromImage} disabled={!isConfigured || !subjectReferenceImage || isGettingIdea} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                                 {isGettingIdea ? <div className="spinner !w-5 !h-5"></div> : '💡'} Get Idea & Send to Tools
@@ -76,30 +82,62 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                 </aside>
                 
                 <main className="w-full md:w-2/3 lg:w-3/4 bg-black/50 p-6 flex flex-col gap-6 overflow-y-auto">
-                     <div className="space-y-4">
+                     <div className="space-y-6">
+                        {/* --- CUSTOM PROMPT SECTION --- */}
                         <div>
-                            <h2 className="text-xl font-bold">Generated Prompt</h2>
-                            <p className="text-sm text-gray-400 mt-1">This prompt is automatically generated from the studio settings. Edit settings to update it.</p>
-                        </div>
-                        <div>
+                            <h2 className="text-xl font-bold">Custom Prompt</h2>
+                            <p className="text-sm text-gray-400 mt-1">
+                                Manually enter your prompt here. Disable "Use Studio Prompt" below to use this for generation.
+                            </p>
                             <div className="relative mt-2">
-                                <textarea 
-                                    readOnly 
-                                    value={generatedPrompt} 
-                                    placeholder="Your generated prompt will appear here..." 
-                                    className="w-full h-40 p-3 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition resize-none font-mono text-sm"
+                                <textarea
+                                    value={userPrompt}
+                                    onChange={(e) => {
+                                        setUserPrompt(e.target.value);
+                                        if (useStudioPrompt) {
+                                            setUseStudioPrompt(false); // Auto-disable studio prompt on edit
+                                        }
+                                    }}
+                                    placeholder="Enter a custom prompt or apply one from AI Tools..."
+                                    className={`w-full h-24 p-3 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition resize-y font-mono text-sm ${useStudioPrompt ? 'opacity-50' : ''}`}
                                 />
                             </div>
+                        </div>
+
+                        {/* --- STUDIO GENERATED PROMPT SECTION --- */}
+                        <div>
+                            <h2 className="text-xl font-bold">Studio Generated Prompt</h2>
+                            <p className="text-sm text-gray-400 mt-1">This prompt is automatically generated from the studio settings. Edit settings to update it.</p>
+                            <div className="relative mt-2">
+                                <textarea
+                                    readOnly
+                                    value={studioPrompt}
+                                    placeholder="Your generated prompt will appear here..."
+                                    className={`w-full h-24 p-3 bg-gray-800 border border-gray-600 transition resize-none font-mono text-sm ${!useStudioPrompt ? 'opacity-50' : ''}`}
+                                />
+                            </div>
+                             <div className="mt-4 p-3 bg-gray-800/50">
+                                <ToggleSwitch
+                                    id="use-studio-prompt"
+                                    checked={useStudioPrompt}
+                                    onChange={(e) => setUseStudioPrompt(e.target.checked)}
+                                    label="Use Studio Prompt for Generation"
+                                />
+                             </div>
+                        </div>
+
+                        {/* --- ACTION BUTTONS --- */}
+                        <div>
                              <div className="flex items-center gap-4 mt-3">
-                                 <button onClick={handleGenerateImage} disabled={!isConfigured || isGenerating || !generatedPrompt} className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300">{generateButtonText}</button>
-                                 <button onClick={handleCopyPrompt} className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300">{copySuccess ? 'Copied!' : '📋 Copy Prompt'}</button>
+                                 <button onClick={handleGenerateImage} disabled={!isConfigured || isGenerating || !activePrompt} className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300">{generateButtonText}</button>
+                                 <button onClick={handleCopyPrompt} className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300">{copySuccess ? 'Copied!' : '📋 Copy Active Prompt'}</button>
                                  <div className="relative">
                                     <button
                                         onClick={() => setShowSavePromptOptions(p => !p)}
-                                        disabled={!generatedPrompt.trim() || !s3Available}
+                                        disabled={!activePrompt.trim() || !s3Available}
                                         className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
                                     >
-                                        💾 Save Prompt
+                                        💾 Save Active Prompt
                                     </button>
                                     {showSavePromptOptions && collection.folders.length > 0 && (
                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max bg-gray-600 shadow-lg z-10 text-center">
@@ -108,7 +146,7 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                                                     <li key={folder.id}>
                                                         <button
                                                             onClick={() => {
-                                                                onSavePrompt(generatedPrompt, folder.id);
+                                                                onSavePrompt(activePrompt, folder.id);
                                                                 setShowSavePromptOptions(false);
                                                             }}
                                                             className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-500"
