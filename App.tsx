@@ -137,6 +137,8 @@ const App = () => {
         fashionAesthetics: 'Meticulously detailed fashion aesthetics',
         aspectRatio: '9:16',
     });
+    const [isPromptOverridden, setIsPromptOverridden] = useState(initialCreatorState?.isPromptOverridden ?? false);
+
 
     // S3 & Settings State
     const [s3Config, setS3ConfigState] = useState(CONFIG.s3);
@@ -305,7 +307,7 @@ const App = () => {
     useEffect(() => {
         const creatorStateToSave = {
             generatedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
-            strictFaceLock, strictHairLock, photorealisticSettings
+            strictFaceLock, strictHairLock, photorealisticSettings, isPromptOverridden
         };
         try {
             localStorage.setItem('gemini-creator-state', JSON.stringify(creatorStateToSave));
@@ -315,7 +317,7 @@ const App = () => {
     }, [
         generatedPrompt, subjectReferenceImage, subjectReferenceImageMimeType,
         strictFaceLock, strictHairLock,
-        photorealisticSettings
+        photorealisticSettings, isPromptOverridden
     ]);
 
     const handleGenerateImage = async () => {
@@ -373,14 +375,14 @@ const App = () => {
             let fidelityInstructions = '';
             if (hasSubject) {
                 if (strictFaceLock) {
-                    fidelityInstructions += " The face of the subject MUST be an exact, photorealistic match to the reference image. Do not alter the facial features, structure, or identity.";
+                    fidelityInstructions += "The face of the subject MUST be an exact, photorealistic match to the reference image. Do not alter the facial features, structure, or identity. ";
                 }
                 if (strictHairLock) {
-                    fidelityInstructions += " The hair color, length, and style of the subject MUST match the reference image exactly.";
+                    fidelityInstructions += "The hair color, length, and style of the subject MUST match the reference image exactly. ";
                 }
             }
             
-            const instructionText = generatedPrompt + fidelityInstructions;
+            const instructionText = fidelityInstructions + generatedPrompt;
 
             if (hasSubject) {
                 const base64Data = subjectReferenceImage.split(',')[1];
@@ -401,7 +403,7 @@ const App = () => {
                 // Case for no reference image, using Imagen
                 const response = await ai.models.generateImages({
                     model: 'imagen-4.0-generate-001',
-                    prompt: generatedPrompt,
+                    prompt: instructionText,
                     config: { numberOfImages: 1, aspectRatio: photorealisticSettings.aspectRatio === '9:16' ? '9:16' : '1:1' },
                 });
                 const images = response.generatedImages.map(img => `data:image/png;base64,${img.image.imageBytes}`);
@@ -504,7 +506,7 @@ const App = () => {
     const handleUseSettings = (image: StoredImage) => {
         const { settings } = image;
         if (settings.photorealisticSettings) {
-            setPhotorealisticSettings(settings.photorealisticSettings);
+            handlePhotorealisticSettingsChange(settings.photorealisticSettings);
         }
         setGeneratedPrompt(image.prompt);
         setActiveTab('creator');
@@ -588,9 +590,14 @@ const App = () => {
         }
     };
     
+    const handlePhotorealisticSettingsChange = (newSettings: DecodedPrompt) => {
+        setPhotorealisticSettings(newSettings);
+        setIsPromptOverridden(false);
+    };
+
     const handleApplyDecodedPrompt = (decoded: DecodedPrompt) => {
         if (!decoded) return;
-        setPhotorealisticSettings(decoded);
+        handlePhotorealisticSettingsChange(decoded);
         setActiveTab('creator');
     };
 
@@ -601,16 +608,26 @@ const App = () => {
         setReverseEngineeredPrompt('');
 
         const instruction = `
-            You are an expert at reverse engineering images to create highly detailed, cinematic, and optimized prompts for an image generation AI. Analyze the provided reference image and generate a new prompt in the style of the following examples. The goal is to capture the essence, style, composition, lighting, and subject of the reference image, but described in a rich, evocative way like the examples.
+            You are an expert at reverse engineering images to create highly detailed, cinematic, and optimized prompts for an image generation AI. Your task is to analyze the provided reference image and generate a new prompt in the style of the provided examples.
+
+            First, think step-by-step. Write down your analysis of the image, covering these aspects:
+            - **Subject:** Describe the main person or object.
+            - **Composition:** How is the shot framed (e.g., close-up, full-body)? What's the camera angle?
+            - **Lighting:** Describe the lighting style (e.g., soft, dramatic, natural).
+            - **Style & Mood:** What is the overall artistic style (e.g., cinematic, editorial, candid) and mood (e.g., romantic, mysterious, energetic)?
+            - **Details:** Note any important details like clothing, accessories, or background elements.
 
             IMPORTANT: If the reference image contains a person, the generated prompt MUST include the phrase 'using the original face' or 'without changing the face' to instruct the image generator to preserve the person's likeness.
+
+            After your analysis, provide the final, optimized prompt. The prompt should be structured like the examples provided below.
+            Start the final prompt on a new line, prefixed with "--- FINAL PROMPT ---".
 
             Here are examples of the desired prompt structure and style:
             ${REVERSE_ENGINEER_EXAMPLES}
 
             ---
 
-            Now, analyze the user's uploaded image and generate a new, optimized prompt based on it, following the style of the examples above. Output ONLY the final prompt text.
+            Now, begin your analysis of the user's uploaded image, followed by the final prompt.
         `;
 
         try {
@@ -618,11 +635,29 @@ const App = () => {
             const imagePart = { inlineData: { mimeType: reverseEngineerImageMimeType, data: base64Data } };
             const textPart = { text: instruction };
             
-            const response = await ai.models.generateContent({
+            const responseStream = await ai.models.generateContentStream({
                 model: 'gemini-2.5-flash',
                 contents: { parts: [imagePart, textPart] },
             });
-            setReverseEngineeredPrompt(response.text.trim());
+
+            let fullResponse = '';
+            for await (const chunk of responseStream) {
+                const chunkText = chunk.text;
+                if (chunkText) {
+                    fullResponse += chunkText;
+                    setReverseEngineeredPrompt(fullResponse);
+                }
+            }
+
+            // After streaming is complete, parse for the final prompt
+            const finalPromptMarker = '--- FINAL PROMPT ---';
+            const finalPromptIndex = fullResponse.indexOf(finalPromptMarker);
+            if (finalPromptIndex !== -1) {
+                const finalPrompt = fullResponse.substring(finalPromptIndex + finalPromptMarker.length).trim();
+                // Set the state to just the clean prompt for copying and applying
+                setReverseEngineeredPrompt(finalPrompt);
+            }
+            
         } catch (e) {
             setError("Failed to reverse engineer the prompt from the image.");
             console.error(e);
@@ -638,6 +673,8 @@ const App = () => {
         // Set the image as a subject reference in the creator
         setSubjectReferenceImage(reverseEngineerImage);
         setSubjectReferenceImageMimeType(reverseEngineerImageMimeType);
+        // Set the override flag to prevent the Creator's useEffect from overwriting the prompt
+        setIsPromptOverridden(true);
         // Switch to the creator tab
         setActiveTab('creator');
     };
@@ -684,8 +721,8 @@ const App = () => {
     };
 
     // --- Props for children ---
-    const creatorState = { generatedPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
-    const creatorHandlers = { setGeneratedPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings };
+    const creatorState = { generatedPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai, isPromptOverridden };
+    const creatorHandlers = { setGeneratedPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange };
     const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
     const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt };
 

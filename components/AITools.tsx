@@ -164,13 +164,18 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
             <main className="w-full md:w-1/2 lg:w-2/3 bg-gray-900 p-6 flex flex-col gap-6 overflow-y-auto">
                 <h2 className="text-xl font-bold">Generated Prompt</h2>
                 <div className="flex-grow bg-black/50 p-4 flex items-center justify-center min-h-0 relative">
-                    {isReverseEngineering && <Loader message="Generating prompt from image..." />}
+                    {/* Show loader only when generating AND there's no text yet */}
+                    {isReverseEngineering && !reverseEngineeredPrompt && <Loader message="Generating prompt from image..." />}
+                    
+                    {/* Show placeholder text div when not generating and no text */}
                     {!isReverseEngineering && !reverseEngineeredPrompt && (
                         <div className="text-center text-gray-500">
                             The generated prompt will appear here.
                         </div>
                     )}
-                    {!isReverseEngineering && reverseEngineeredPrompt && (
+                    
+                    {/* Show textarea if there's text (either streaming or final) */}
+                    {reverseEngineeredPrompt && (
                         <textarea
                             readOnly
                             value={reverseEngineeredPrompt}

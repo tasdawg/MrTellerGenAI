@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { Collection as CollectionType, CollectionItem, DecodedPrompt, StoredImage, TemplatePrompt } from '../utils/db';
 import { Loader } from './Loader';
 
-const CollectionItemCard = ({ item }: { item: CollectionItem }) => {
+// FIX: Explicitly typed the component with React.FC to help TypeScript correctly handle the special `key` prop.
+const CollectionItemCard: React.FC<{ item: CollectionItem }> = ({ item }) => {
     const { type, content } = item;
     const [isCopied, setIsCopied] = useState(false);
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
-export const CollapsibleSection = ({ title, defaultOpen = false, children }: { title: string, defaultOpen?: boolean, children: React.ReactNode }) => {
+// FIX: Made the `children` prop optional to resolve a TypeScript error.
+export const CollapsibleSection = ({ title, defaultOpen = false, children }: { title: string, defaultOpen?: boolean, children?: React.ReactNode }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
     return (
