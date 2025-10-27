@@ -5,11 +5,14 @@ import { renderFormControl } from '../utils/ui';
 
 export const AITools = ({ state, handlers, collection }: { state: any, handlers: any, collection: Collection }) => {
     const { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt } = state;
-    const { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt } = handlers;
+    const { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt, handleSaveReverseEngineeredPrompt } = handlers;
 
     const [activeTool, setActiveTool] = useState('decoder'); // 'decoder' or 'reverse_engineer'
     const [promptToDecode, setPromptToDecode] = useState('');
     const [showSaveOptions, setShowSaveOptions] = useState(false);
+    const [showSaveView, setShowSaveView] = useState(false);
+    const [saveName, setSaveName] = useState('');
+
 
     const onDecodeClick = () => {
         if (promptToDecode.trim()) {
@@ -33,6 +36,17 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
     const handleRemoveImage = () => {
         setReverseEngineerImage(null);
         setReverseEngineerImageMimeType('');
+    };
+
+    const handleConfirmSaveReversePrompt = () => {
+        if (saveName.trim() && reverseEngineeredPrompt) {
+            handleSaveReverseEngineeredPrompt({
+                name: saveName.trim(),
+                prompt: reverseEngineeredPrompt
+            });
+            setShowSaveView(false);
+            setSaveName('');
+        }
     };
 
     const renderDecoder = () => (
@@ -164,17 +178,14 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
             <main className="w-full md:w-1/2 lg:w-2/3 bg-gray-900 p-6 flex flex-col gap-6 overflow-y-auto">
                 <h2 className="text-xl font-bold">Generated Prompt</h2>
                 <div className="flex-grow bg-black/50 p-4 flex items-center justify-center min-h-0 relative">
-                    {/* Show loader only when generating AND there's no text yet */}
                     {isReverseEngineering && !reverseEngineeredPrompt && <Loader message="Generating prompt from image..." />}
                     
-                    {/* Show placeholder text div when not generating and no text */}
                     {!isReverseEngineering && !reverseEngineeredPrompt && (
                         <div className="text-center text-gray-500">
                             The generated prompt will appear here.
                         </div>
                     )}
                     
-                    {/* Show textarea if there's text (either streaming or final) */}
                     {reverseEngineeredPrompt && (
                         <textarea
                             readOnly
@@ -183,21 +194,47 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                         />
                     )}
                 </div>
-                <div className="relative flex items-center gap-4">
-                     <button
-                        onClick={() => navigator.clipboard.writeText(reverseEngineeredPrompt)}
-                        disabled={!reverseEngineeredPrompt}
-                        className="px-6 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
-                    >
-                        📋 Copy Prompt
-                    </button>
-                    <button
-                        onClick={handleApplyReverseEngineeredPrompt}
-                        disabled={!reverseEngineeredPrompt}
-                        className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"
-                    >
-                        ⚙️ Use in Creator
-                    </button>
+                <div className="flex-shrink-0">
+                    <div className="relative flex items-center gap-4">
+                         <button
+                            onClick={() => navigator.clipboard.writeText(reverseEngineeredPrompt)}
+                            disabled={!reverseEngineeredPrompt}
+                            className="px-6 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
+                        >
+                            📋 Copy Prompt
+                        </button>
+                        <button
+                            onClick={() => { setShowSaveView(true); setSaveName(''); }}
+                            disabled={!reverseEngineeredPrompt}
+                            className="px-6 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
+                        >
+                            💾 Save Prompt
+                        </button>
+                        <button
+                            onClick={handleApplyReverseEngineeredPrompt}
+                            disabled={!reverseEngineeredPrompt}
+                            className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        >
+                            ⚙️ Use in Creator
+                        </button>
+                    </div>
+                    {showSaveView && (
+                        <div className="mt-4 p-4 bg-gray-800 space-y-3">
+                             <p className="text-sm font-semibold">Save to "Reverse Engineered Prompts"</p>
+                             <div className="flex items-center gap-2">
+                                <input 
+                                    type="text" 
+                                    value={saveName} 
+                                    onChange={(e) => setSaveName(e.target.value)} 
+                                    placeholder="Enter a name for this prompt"
+                                    className="flex-grow p-2 bg-gray-700 border border-gray-600"
+                                    aria-label="Prompt name"
+                                />
+                                <button onClick={handleConfirmSaveReversePrompt} className="px-4 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400">Save</button>
+                                <button onClick={() => setShowSaveView(false)} className="px-4 py-2 bg-gray-900 hover:bg-black font-bold">Cancel</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
         </div>

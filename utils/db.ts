@@ -26,12 +26,20 @@ export interface DecodedPrompt {
 }
 
 export interface TemplatePrompt {
+    id: string;
     title: string;
     prompt: string;
 }
 
+export interface ReverseEngineeredPrompt {
+    id: string;
+    name: string;
+    date: string;
+    prompt: string;
+}
+
 // --- NEW TYPES FOR COLLECTION ---
-export type CollectionItemContent = StoredImage | { prompt: string } | DecodedPrompt | TemplatePrompt;
+export type CollectionItemContent = StoredImage | { title: string, prompt: string } | DecodedPrompt | TemplatePrompt;
 
 export interface CollectionItem {
     id: string;

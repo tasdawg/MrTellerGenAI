@@ -1,14 +1,17 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt } from './utils/db';
+import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt, ReverseEngineeredPrompt } from './utils/db';
 import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
 import { CONFIG } from './utils/config';
-import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, REVERSE_ENGINEER_EXAMPLES } from './utils/constants';
+import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
 import { AITools } from './components/AITools';
 import { SettingsModal } from './components/SettingsModal';
+
 
 // --- HELPER FOR S3 ERROR DIAGNOSIS ---
 const getS3ErrorMessage = (e: any): string => {
@@ -38,34 +41,6 @@ After applying this, refresh the page.
 `;
     }
     return errorMessage;
-};
-
-const parseTemplatePrompts = (): CollectionFolder => {
-    const templateItems: CollectionItem[] = [];
-    // Split by '---' and remove the first empty element if the string starts with it
-    const examples = REVERSE_ENGINEER_EXAMPLES.split('---').filter(s => s.trim().startsWith('EXAMPLE'));
-    
-    examples.forEach((example, index) => {
-        const lines = example.trim().split('\n');
-        const title = lines[0].replace('EXAMPLE ', '').replace(' ---', '').trim();
-        const prompt = lines.slice(1).join('\n').trim();
-
-        templateItems.push({
-            id: `template-${index}`,
-            type: 'template_prompt',
-            timestamp: Date.now() - index, // ensure stable order
-            content: {
-                title: `AI Template: ${title}`,
-                prompt: prompt,
-            } as TemplatePrompt
-        });
-    });
-
-    return {
-        id: 'ai-prompt-templates',
-        name: 'AI Prompt Templates',
-        items: templateItems,
-    };
 };
 
 const generatePhotorealisticPrompt = (settings: any) => {
@@ -132,6 +107,10 @@ const App = () => {
     // Collection State
     const [collection, setCollection] = useState<Collection>({ folders: [] });
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [s3Items, setS3Items] = useState<CollectionItem[]>([]);
+    const [templatePrompts, setTemplatePrompts] = useState<TemplatePrompt[]>([]);
+    const [savedReversePrompts, setSavedReversePrompts] = useState<ReverseEngineeredPrompt[]>([]);
+
 
     // AI Tools State
     const [isDecoding, setIsDecoding] = useState(false);
@@ -195,6 +174,25 @@ const App = () => {
             console.error("Failed to load S3 config from localStorage", e);
             setS3ConfigState(CONFIG.s3);
         }
+
+        // Load local prompt collections from localStorage
+        try {
+            const savedTemplates = localStorage.getItem('user-template-prompts');
+            if (savedTemplates) {
+                setTemplatePrompts(JSON.parse(savedTemplates));
+            } else {
+                fetch('./prompts/templates.json')
+                    .then(response => response.json())
+                    .then(data => setTemplatePrompts(data))
+                    .catch(error => console.error("Failed to fetch default prompt templates:", error));
+            }
+
+            const savedReversed = localStorage.getItem('user-reverse-engineered-prompts');
+            setSavedReversePrompts(savedReversed ? JSON.parse(savedReversed) : []);
+        } catch (error) {
+            console.error("Failed to load local prompts from localStorage", error);
+        }
+
     }, []);
 
     useEffect(() => {
@@ -242,9 +240,6 @@ const App = () => {
         setIsRefreshing(true);
         setError(null);
 
-        const templateFolder = parseTemplatePrompts();
-        let s3Folders: CollectionFolder[] = [];
-
         try {
             const objects = await listFromS3();
             const allItems: CollectionItem[] = [];
@@ -289,38 +284,32 @@ const App = () => {
 
             allItems.sort((a, b) => b.timestamp - a.timestamp);
             
-            // Update savedImages for the gallery tab
+            setS3Items(allItems);
+            
             const galleryImages = allItems
                 .filter(item => item.type === 'image')
                 .map(item => item.content as StoredImage);
             setSavedImages(galleryImages);
-            
-            s3Folders.push({
-                id: 's3-bucket-main',
-                name: 'S3 Bucket',
-                items: allItems
-            });
 
-            setS3Available(true); // Connection is OK
+            setS3Available(true);
 
         } catch (e: any) {
             console.error("Failed to refresh from S3", e);
             setS3Available(wasAvailable => {
-                if (wasAvailable) { // Only show error when transitioning from good to bad state
+                if (wasAvailable) {
                     setError(`S3 Connection Failed: ${getS3ErrorMessage(e)}. Images will now be stored in-memory for this session. Please check your S3 configuration in Settings.`);
                 }
                 return false;
             });
-            setSavedImages([]); // Clear any S3-based images
+            setSavedImages([]);
+            setS3Items([]);
         } finally {
-            setCollection({ folders: [templateFolder, ...s3Folders] });
             setIsRefreshing(false);
         }
     }, []);
 
     // Initial load from S3 after config is settled
     useEffect(() => {
-        // A small delay to allow config to be set from localstorage
         const timer = setTimeout(() => {
             handleRefresh();
         }, 100);
@@ -343,6 +332,45 @@ const App = () => {
         strictFaceLock, strictHairLock,
         photorealisticSettings, isPromptOverridden
     ]);
+
+    // --- COLLECTION BUILDING ---
+    useEffect(() => {
+        const templateFolder: CollectionFolder = {
+            id: 'ai-prompt-templates',
+            name: 'AI Prompt Templates',
+            items: templatePrompts.map((p) => ({
+                id: p.id,
+                type: 'template_prompt',
+                timestamp: 0, // Not sorted by time
+                content: p,
+            })),
+        };
+
+        const reverseEngineeredFolder: CollectionFolder = {
+            id: 'reverse-engineered-prompts',
+            name: 'Reverse Engineered Prompts',
+            items: savedReversePrompts.map(p => ({
+                id: p.id,
+                // FIX: Add type assertion to prevent TypeScript from widening the literal type to 'string'.
+                type: 'prompt' as 'prompt',
+                timestamp: new Date(p.date).getTime(),
+                content: { title: p.name, prompt: p.prompt }
+            })).sort((a, b) => b.timestamp - a.timestamp)
+        };
+        
+        const s3Folder: CollectionFolder = {
+             id: 's3-bucket-main',
+             name: 'S3 Bucket',
+             items: s3Items
+        };
+        
+        const folders = [templateFolder, reverseEngineeredFolder];
+        if (s3Items.length > 0 || s3Available) {
+            folders.push(s3Folder);
+        }
+
+        setCollection({ folders });
+    }, [templatePrompts, savedReversePrompts, s3Items, s3Available]);
 
     // --- AUTOMATIC PROMPT GENERATION ---
     useEffect(() => {
@@ -652,7 +680,7 @@ const App = () => {
         setReverseEngineeredPrompt('');
 
         const instruction = `
-            You are an expert at reverse engineering images to create highly detailed, cinematic, and optimized prompts for an image generation AI. Your task is to analyze the provided reference image and generate a new prompt in the style of the provided examples.
+            You are an expert at reverse engineering images to create highly detailed, cinematic, and optimized prompts for an image generation AI. Your task is to analyze the provided reference image and generate a new prompt.
 
             First, think step-by-step. Write down your analysis of the image, covering these aspects:
             - **Subject:** Describe the main person or object.
@@ -663,11 +691,8 @@ const App = () => {
 
             IMPORTANT: If the reference image contains a person, the generated prompt MUST include the phrase 'using the original face' or 'without changing the face' to instruct the image generator to preserve the person's likeness.
 
-            After your analysis, provide the final, optimized prompt. The prompt should be structured like the examples provided below.
+            After your analysis, provide the final, optimized prompt. The prompt should be structured like the examples provided in your training data.
             Start the final prompt on a new line, prefixed with "--- FINAL PROMPT ---".
-
-            Here are examples of the desired prompt structure and style:
-            ${REVERSE_ENGINEER_EXAMPLES}
 
             ---
 
@@ -723,7 +748,26 @@ const App = () => {
         setActiveTab('creator');
     };
 
+    const handleSaveReverseEngineeredPrompt = ({ name, prompt }: { name: string, prompt: string }) => {
+        const newEntry: ReverseEngineeredPrompt = {
+            id: `rev-${crypto.randomUUID()}`,
+            name: name,
+            date: new Date().toISOString(),
+            prompt: prompt,
+        };
+        const updated = [...savedReversePrompts, newEntry];
+        setSavedReversePrompts(updated);
+        localStorage.setItem('user-reverse-engineered-prompts', JSON.stringify(updated));
+        alert('Prompt saved to Collection!');
+    };
+
+
     // --- Collection Handlers ---
+    const handleSaveTemplatePrompts = (updatedPrompts: TemplatePrompt[]) => {
+        setTemplatePrompts(updatedPrompts);
+        localStorage.setItem('user-template-prompts', JSON.stringify(updatedPrompts));
+    };
+
     const handleAddDummyData = async () => {
         if (!s3Available) {
             setError("Cannot add dummy data. S3 is unavailable.");
@@ -768,7 +812,7 @@ const App = () => {
     const creatorState = { generatedPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai, isPromptOverridden };
     const creatorHandlers = { setGeneratedPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange };
     const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
-    const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt };
+    const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt, handleSaveReverseEngineeredPrompt };
 
     return (
         <div className="h-screen bg-black flex flex-col p-4 gap-4 text-gray-200">
@@ -823,6 +867,7 @@ const App = () => {
                         onAddDummyData={handleAddDummyData}
                         s3Available={s3Available}
                         onOpenSettings={() => setIsSettingsModalOpen(true)}
+                        onSaveTemplates={handleSaveTemplatePrompts}
                     />
                 )}
                  {activeTab === 'ai_tools' && (
