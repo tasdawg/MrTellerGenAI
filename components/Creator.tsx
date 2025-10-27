@@ -6,49 +6,15 @@ import { PhotorealisticSection } from './PhotorealisticSection';
 import { renderFormControl } from '../utils/ui';
 import { Collection } from '../utils/db';
 
-const generatePhotorealisticPrompt = (settings: any) => {
-    const promptParts = [
-        `Create a photorealistic image.`,
-        `She is wearing a ${settings.dressDetails} ${settings.dressColor} ${settings.dressStyle}.`,
-        `Her hair is ${settings.hairStyle}. She has a ${settings.hairAccessory}.`,
-        `The background is ${settings.background} with ${settings.backgroundElements}.`
-    ];
-
-    if (settings.shotPose !== 'Custom Pose') {
-         promptParts.push(`The shot is composed as a ${settings.shotPose}.`);
-    } else {
-        promptParts.push(`She is ${settings.action}. Her skirt is flowing.`);
-        promptParts.push(`${settings.gaze}.`);
-    }
-
-    promptParts.push(`Shot on a ${settings.cameraModel} with a ${settings.lensType}.`);
-    promptParts.push(`The lighting and shadows should be ${settings.lighting}.`);
-    promptParts.push(`${settings.skin}.`);
-    promptParts.push(`${settings.fashionAesthetics}.`);
-    promptParts.push(`Aspect ratio ${settings.aspectRatio} -- hyperrealism.`);
-    
-    return promptParts.join(' ');
-};
-
-
 export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: any, handlers: any, collection: Collection, onSavePrompt: (prompt: string, folderId: string) => void }) => {
     const { generatedPrompt, generatedImages, isGenerating,
             error, copySuccess, subjectReferenceImage, isGettingIdea,
-            strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured, isPromptOverridden } = state;
+            strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured } = state;
     const { setGeneratedPrompt,
             handleGenerateImage, handleCopyPrompt,
             handleImageUpload, handleRemoveImage, handleGetIdeaFromImage,
             setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings } = handlers;
     
-    React.useEffect(() => {
-        // Only generate the prompt from settings if it hasn't been manually overridden
-        // (e.g., by applying a prompt from AI Tools).
-        if (!isPromptOverridden) {
-            const prompt = generatePhotorealisticPrompt(photorealisticSettings);
-            setGeneratedPrompt(prompt);
-        }
-    }, [photorealisticSettings, setGeneratedPrompt, isPromptOverridden]);
-
     const [showSavePromptOptions, setShowSavePromptOptions] = React.useState(false);
     const [enlargedImageSrc, setEnlargedImageSrc] = React.useState<string | null>(null);
     

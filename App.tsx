@@ -68,6 +68,30 @@ const parseTemplatePrompts = (): CollectionFolder => {
     };
 };
 
+const generatePhotorealisticPrompt = (settings: any) => {
+    const promptParts = [
+        `Create a photorealistic image.`,
+        `She is wearing a ${settings.dressDetails} ${settings.dressColor} ${settings.dressStyle}.`,
+        `Her hair is ${settings.hairStyle}. She has a ${settings.hairAccessory}.`,
+        `The background is ${settings.background} with ${settings.backgroundElements}.`
+    ];
+
+    if (settings.shotPose !== 'Custom Pose') {
+         promptParts.push(`The shot is composed as a ${settings.shotPose}.`);
+    } else {
+        promptParts.push(`She is ${settings.action}. Her skirt is flowing.`);
+        promptParts.push(`${settings.gaze}.`);
+    }
+
+    promptParts.push(`Shot on a ${settings.cameraModel} with a ${settings.lensType}.`);
+    promptParts.push(`The lighting and shadows should be ${settings.lighting}.`);
+    promptParts.push(`${settings.skin}.`);
+    promptParts.push(`${settings.fashionAesthetics}.`);
+    promptParts.push(`Aspect ratio ${settings.aspectRatio} -- hyperrealism.`);
+    
+    return promptParts.join(' ');
+};
+
 
 const App = () => {
     // --- State Management ---
@@ -320,6 +344,36 @@ const App = () => {
         photorealisticSettings, isPromptOverridden
     ]);
 
+    // --- AUTOMATIC PROMPT GENERATION ---
+    useEffect(() => {
+        if (isPromptOverridden) {
+            return; // Don't auto-generate if the prompt is manually set
+        }
+
+        const basePrompt = generatePhotorealisticPrompt(photorealisticSettings);
+        
+        let fidelityInstructions = '';
+        const hasSubject = !!subjectReferenceImage;
+        if (hasSubject) {
+            if (strictFaceLock) {
+                fidelityInstructions += "The subject's face MUST be a 100% photorealistic match to the reference image. Do not change any details about the eyes, face, nose, mouth, or ears. The final image must use the exact face from the reference without any deviation. ";
+            }
+            if (strictHairLock) {
+                fidelityInstructions += "The hair color, length, and style of the subject MUST match the reference image exactly. ";
+            }
+        }
+        
+        const finalPrompt = fidelityInstructions + basePrompt;
+        setGeneratedPrompt(finalPrompt);
+
+    }, [
+        photorealisticSettings, 
+        strictFaceLock, 
+        strictHairLock, 
+        subjectReferenceImage, 
+        isPromptOverridden
+    ]);
+
     const handleGenerateImage = async () => {
         if (!ai || !generatedPrompt) return;
         setIsGenerating(true);
@@ -372,17 +426,7 @@ const App = () => {
         const hasSubject = !!subjectReferenceImage;
        
         try {
-            let fidelityInstructions = '';
-            if (hasSubject) {
-                if (strictFaceLock) {
-                    fidelityInstructions += "The face of the subject MUST be an exact, photorealistic match to the reference image. Do not alter the facial features, structure, or identity. ";
-                }
-                if (strictHairLock) {
-                    fidelityInstructions += "The hair color, length, and style of the subject MUST match the reference image exactly. ";
-                }
-            }
-            
-            const instructionText = fidelityInstructions + generatedPrompt;
+            const instructionText = generatedPrompt;
 
             if (hasSubject) {
                 const base64Data = subjectReferenceImage.split(',')[1];
