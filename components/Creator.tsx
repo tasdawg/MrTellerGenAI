@@ -5,21 +5,21 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { PhotorealisticSection } from './PhotorealisticSection';
 import { Collection } from '../utils/db';
 
-export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: any, handlers: any, collection: Collection, onSavePrompt: (prompt: string, folderId: string) => void }) => {
+export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: any, handlers: any, collection: Collection, onSavePrompt: (prompt: string) => void }) => {
     const {
         userPrompt, studioPrompt, useStudioPrompt,
         generatedImages, isGenerating,
         error, copySuccess, subjectReferenceImage, isGettingIdea,
-        strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured
+        strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured, promptHistory
     } = state;
     const {
         setUserPrompt, setUseStudioPrompt,
         handleGenerateImage, handleCopyPrompt,
         handleImageUpload, handleRemoveImage, handleGetIdeaFromImage,
-        setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings
+        setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings,
+        handleSelectHistoryPrompt, handleClearPromptHistory
     } = handlers;
     
-    const [showSavePromptOptions, setShowSavePromptOptions] = React.useState(false);
     const [enlargedImageSrc, setEnlargedImageSrc] = React.useState<string | null>(null);
     
     let generateButtonText = '🖼 Generate Image';
@@ -81,8 +81,9 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
 
                 </aside>
                 
-                <main className="w-full md:w-2/3 lg:w-3/4 bg-black/50 p-6 flex flex-col gap-6 overflow-y-auto">
-                     <div className="space-y-6">
+                <main className="w-full md:w-2/3 lg:w-3/4 bg-black/50 p-6 flex flex-row gap-6 overflow-hidden">
+                    {/* --- Left Column: Prompts & Controls --- */}
+                     <div className="w-1/2 flex flex-col gap-6 overflow-y-auto pr-2">
                         {/* --- CUSTOM PROMPT SECTION --- */}
                         <div>
                             <h2 className="text-xl font-bold">Custom Prompt</h2>
@@ -101,6 +102,35 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                                     placeholder="Enter a custom prompt or apply one from AI Tools..."
                                     className={`w-full h-24 p-3 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition resize-y font-mono text-sm ${useStudioPrompt ? 'opacity-50' : ''}`}
                                 />
+                            </div>
+                            <div className="mt-2">
+                                <CollapsibleSection title="Prompt History">
+                                    {promptHistory && promptHistory.length > 0 ? (
+                                        <>
+                                            <button 
+                                                onClick={handleClearPromptHistory}
+                                                className="w-full text-center text-xs py-1 px-2 bg-red-900 hover:bg-red-800 text-white transition mb-2 font-semibold"
+                                            >
+                                                Clear All History
+                                            </button>
+                                            <ul className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                                {promptHistory.map((prompt, index) => (
+                                                    <li key={index}>
+                                                        <button
+                                                            onClick={() => handleSelectHistoryPrompt(prompt)}
+                                                            title={prompt} // Show full prompt on hover
+                                                            className="w-full text-left text-xs p-2 bg-gray-800 hover:bg-gray-700 transition text-gray-400 truncate"
+                                                        >
+                                                            {prompt}
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 p-2">Your recently used prompts will appear here after you generate an image.</p>
+                                    )}
+                                </CollapsibleSection>
                             </div>
                         </div>
 
@@ -131,39 +161,19 @@ export const Creator = ({ state, handlers, collection, onSavePrompt }: { state: 
                              <div className="flex items-center gap-4 mt-3">
                                  <button onClick={handleGenerateImage} disabled={!isConfigured || isGenerating || !activePrompt} className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300">{generateButtonText}</button>
                                  <button onClick={handleCopyPrompt} className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300">{copySuccess ? 'Copied!' : '📋 Copy Active Prompt'}</button>
-                                 <div className="relative">
-                                    <button
-                                        onClick={() => setShowSavePromptOptions(p => !p)}
-                                        disabled={!activePrompt.trim() || !s3Available}
-                                        className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
-                                    >
-                                        💾 Save Active Prompt
-                                    </button>
-                                    {showSavePromptOptions && collection.folders.length > 0 && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max bg-gray-600 shadow-lg z-10 text-center">
-                                            <ul className="py-1">
-                                                {collection.folders.map(folder => folder.id !== 'ai-prompt-templates' && ( // Don't allow saving to template folder
-                                                    <li key={folder.id}>
-                                                        <button
-                                                            onClick={() => {
-                                                                onSavePrompt(activePrompt, folder.id);
-                                                                setShowSavePromptOptions(false);
-                                                            }}
-                                                            className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-500"
-                                                        >
-                                                            {folder.name}
-                                                        </button>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
+                                 <button
+                                    onClick={() => onSavePrompt(activePrompt)}
+                                    disabled={!activePrompt.trim()}
+                                    className="px-4 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
+                                >
+                                    💾 Save Active Prompt
+                                </button>
                              </div>
                         </div>
                      </div>
 
-                     <div className="flex-grow bg-black/50 p-4 flex items-center justify-center min-h-0">
+                    {/* --- Right Column: Image Display --- */}
+                     <div className="w-1/2 bg-black/50 p-4 flex items-center justify-center min-h-0">
                         {error && <div className="text-center text-red-400 border border-red-500 p-4"><p className="font-bold">An Error Occurred</p><p>{error}</p></div>}
                         {!error && isGenerating && <Loader message="Generating & saving..."/>}
                         {!error && !isGenerating && generatedImages.length === 0 && <div className="text-center text-gray-500">{ isConfigured ? 'Your generated images will appear here.' : 'Please set your API Key in Settings to generate images.'}</div>}

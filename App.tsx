@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt, ReverseEngineeredPrompt } from './utils/db';
+import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt, ReverseEngineeredPrompt, UserSavedPrompt } from './utils/db';
 import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
 import { CONFIG } from './utils/config';
-import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, CLOTHING_DETAILS_MAP, HAIR_STYLES, HAIR_ACCESSORIES, SKIN_DETAILS, FASHION_AESTHETICS } from './utils/constants';
+import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, CLOTHING_DETAILS_MAP, HAIR_STYLES, HAIR_ACCESSORIES, SKIN_DETAILS, FASHION_AESTHETICS, SHADOW_INTENSITY_OPTIONS, HIGHLIGHT_BLOOM_OPTIONS, GENDERS, ETHNICITIES } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
@@ -43,23 +43,32 @@ After applying this, refresh the page.
     return errorMessage;
 };
 
-const generatePhotorealisticPrompt = (settings: any) => {
+const generatePhotorealisticPrompt = (settings: DecodedPrompt) => {
+    const subject = settings.gender === 'Female' ? 'woman' : 'man';
+    const pronoun = settings.gender === 'Female' ? 'She' : 'He';
+    const possessive = settings.gender === 'Female' ? 'Her' : 'His';
+
     const promptParts = [
-        `Create a photorealistic image.`,
-        `She is wearing a ${settings.dressDetails} ${settings.dressColor} ${settings.dressStyle}.`,
-        `Her hair is ${settings.hairStyle}. She has a ${settings.hairAccessory}.`,
+        `Create a photorealistic image of a ${settings.ethnicity} ${subject}.`,
+        `${pronoun} is wearing a ${settings.dressDetails} ${settings.dressColor} ${settings.dressStyle}.`,
+        `${possessive} hair is ${settings.hairStyle}. ${pronoun} has a ${settings.hairAccessory}.`,
         `The background is ${settings.background} with ${settings.backgroundElements}.`
     ];
 
     if (settings.shotPose !== 'Custom Pose') {
          promptParts.push(`The shot is composed as a ${settings.shotPose}.`);
     } else {
-        promptParts.push(`She is ${settings.action}. Her skirt is flowing.`);
+        const clothingFlows = ['Ancient Chinese Dress', 'Hanfu', 'Qipao', 'Modern Minimalist Gown', 'Bohemian Beach Sundress', 'Japanese Kimono', 'Korean Hanbok', 'Indian Saree', 'Gothic Victorian Ballgown', 'Mermaid Tail Skirt'].includes(settings.dressStyle);
+        if (settings.gender === 'Female' && clothingFlows) {
+            promptParts.push(`${pronoun} is ${settings.action}. ${possessive} skirt is flowing.`);
+        } else {
+            promptParts.push(`${pronoun} is ${settings.action}.`);
+        }
         promptParts.push(`${settings.gaze}.`);
     }
 
     promptParts.push(`Shot on a ${settings.cameraModel} with a ${settings.lensType}.`);
-    promptParts.push(`The lighting and shadows should be ${settings.lighting}.`);
+    promptParts.push(`The lighting is ${settings.lighting}, featuring ${settings.shadowIntensity} and ${settings.highlightBloom}.`);
     promptParts.push(`${settings.skin}.`);
     promptParts.push(`${settings.fashionAesthetics}.`);
     promptParts.push(`Aspect ratio ${settings.aspectRatio} -- hyperrealism.`);
@@ -115,6 +124,8 @@ const App = () => {
     const [s3Items, setS3Items] = useState<CollectionItem[]>([]);
     const [templatePrompts, setTemplatePrompts] = useState<TemplatePrompt[]>([]);
     const [savedReversePrompts, setSavedReversePrompts] = useState<ReverseEngineeredPrompt[]>([]);
+    const [userSavedPrompts, setUserSavedPrompts] = useState<UserSavedPrompt[]>([]);
+    const [promptHistory, setPromptHistory] = useState<string[]>([]);
 
 
     // AI Tools State
@@ -127,7 +138,9 @@ const App = () => {
 
 
     // Photorealistic Studio State (lifted from component)
-    const [photorealisticSettings, setPhotorealisticSettings] = useState(initialCreatorState?.photorealisticSettings ?? {
+    const [photorealisticSettings, setPhotorealisticSettings] = useState<DecodedPrompt>(initialCreatorState?.photorealisticSettings ?? {
+        gender: GENDERS[0],
+        ethnicity: ETHNICITIES[0],
         dressStyle: DRESS_STYLES[0],
         dressColor: 'red',
         dressDetails: CLOTHING_DETAILS_MAP[DRESS_STYLES[0]][0],
@@ -138,6 +151,8 @@ const App = () => {
         action: 'running away from something',
         gaze: GAZE_OPTIONS[0],
         lighting: LIGHTING_PRESETS[0],
+        shadowIntensity: SHADOW_INTENSITY_OPTIONS[0],
+        highlightBloom: HIGHLIGHT_BLOOM_OPTIONS[0],
         shotPose: SHOT_POSES[0].value,
         cameraModel: CAMERA_MODELS[0],
         lensType: LENS_TYPES[0],
@@ -193,6 +208,13 @@ const App = () => {
 
             const savedReversed = localStorage.getItem('user-reverse-engineered-prompts');
             setSavedReversePrompts(savedReversed ? JSON.parse(savedReversed) : []);
+            
+            const savedCreatorPrompts = localStorage.getItem('user-creator-prompts');
+            setUserSavedPrompts(savedCreatorPrompts ? JSON.parse(savedCreatorPrompts) : []);
+
+            const savedHistory = localStorage.getItem('user-prompt-history');
+            setPromptHistory(savedHistory ? JSON.parse(savedHistory) : []);
+
         } catch (error) {
             console.error("Failed to load local prompts from localStorage", error);
         }
@@ -342,13 +364,45 @@ const App = () => {
         strictFaceLock, strictHairLock,
         photorealisticSettings
     ]);
+    
+    // Save user prompts to localStorage whenever they change
+    useEffect(() => {
+        try {
+            localStorage.setItem('user-creator-prompts', JSON.stringify(userSavedPrompts));
+        } catch (error) {
+            console.error("Could not save creator prompts to localStorage", error);
+        }
+    }, [userSavedPrompts]);
+
+    // Save prompt history to localStorage whenever it changes
+    useEffect(() => {
+        try {
+            localStorage.setItem('user-prompt-history', JSON.stringify(promptHistory));
+        } catch (error) {
+            console.error("Could not save prompt history to localStorage", error);
+        }
+    }, [promptHistory]);
+
 
     // --- COLLECTION BUILDING ---
     useEffect(() => {
+        const userSavedFolder: CollectionFolder = {
+            id: 'user-saved-prompts',
+            name: 'My Saved Prompts',
+            // FIX: Add a return type to the map function to ensure the 'type' property is a literal, not a string. This resolves the TypeScript error.
+            items: userSavedPrompts.map((p): CollectionItem => ({
+                id: p.id,
+                type: 'user_saved_prompt',
+                timestamp: p.timestamp,
+                content: p,
+            })).sort((a, b) => b.timestamp - a.timestamp),
+        };
+
         const templateFolder: CollectionFolder = {
             id: 'ai-prompt-templates',
             name: 'AI Prompt Templates',
-            items: templatePrompts.map((p) => ({
+            // FIX: Add a return type for consistency and to prevent potential type-widening issues.
+            items: templatePrompts.map((p): CollectionItem => ({
                 id: p.id,
                 type: 'template_prompt',
                 timestamp: 0, // Not sorted by time
@@ -359,10 +413,10 @@ const App = () => {
         const reverseEngineeredFolder: CollectionFolder = {
             id: 'reverse-engineered-prompts',
             name: 'Reverse Engineered Prompts',
-            items: savedReversePrompts.map(p => ({
+            // FIX: Use a return type for consistency, replacing the previous type assertion.
+            items: savedReversePrompts.map((p): CollectionItem => ({
                 id: p.id,
-                // FIX: Add type assertion to prevent TypeScript from widening the literal type to 'string'.
-                type: 'prompt' as 'prompt',
+                type: 'prompt',
                 timestamp: new Date(p.date).getTime(),
                 content: { title: p.name, prompt: p.prompt }
             })).sort((a, b) => b.timestamp - a.timestamp)
@@ -374,13 +428,13 @@ const App = () => {
              items: s3Items
         };
         
-        const folders = [templateFolder, reverseEngineeredFolder];
+        const folders = [userSavedFolder, templateFolder, reverseEngineeredFolder];
         if (s3Items.length > 0 || s3Available) {
             folders.push(s3Folder);
         }
 
         setCollection({ folders });
-    }, [templatePrompts, savedReversePrompts, s3Items, s3Available]);
+    }, [templatePrompts, savedReversePrompts, s3Items, s3Available, userSavedPrompts]);
 
     // --- AUTOMATIC PROMPT GENERATION ---
     useEffect(() => {
@@ -407,9 +461,23 @@ const App = () => {
         subjectReferenceImage
     ]);
 
+    const handleAddToPromptHistory = (prompt: string) => {
+        if (!prompt || prompt.trim() === '') return;
+        
+        setPromptHistory(prevHistory => {
+            // Remove the prompt if it already exists to move it to the top
+            const filteredHistory = prevHistory.filter(p => p !== prompt);
+            const newHistory = [prompt, ...filteredHistory];
+            // Limit history size to 50 entries
+            return newHistory.slice(0, 50); 
+        });
+    };
+
     const handleGenerateImage = async () => {
         const promptToUse = useStudioPrompt ? studioPrompt : userPrompt;
         if (!ai || !promptToUse) return;
+
+        handleAddToPromptHistory(promptToUse);
         
         setIsGenerating(true);
         setGeneratedImages([]);
@@ -505,6 +573,20 @@ const App = () => {
         });
     };
     
+    const handleSaveCreatorPrompt = (promptToSave: string) => {
+        const title = window.prompt("Enter a title for your saved prompt:", "My Awesome Prompt");
+        if (title && title.trim()) {
+            const newSavedPrompt: UserSavedPrompt = {
+                id: `user-${crypto.randomUUID()}`,
+                title: title.trim(),
+                prompt: promptToSave,
+                timestamp: Date.now(),
+            };
+            setUserSavedPrompts(prev => [...prev, newSavedPrompt]);
+            alert(`Prompt "${title.trim()}" saved to "My Saved Prompts" in the Collection tab!`);
+        }
+    };
+    
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && file.type.startsWith('image/')) {
@@ -597,6 +679,27 @@ const App = () => {
        alert("Upscaling is not compatible with S3 storage in this version.");
     };
 
+    const handleSaveGalleryPromptToCollection = (image: StoredImage, folderId: string) => {
+        if (folderId !== 'user-saved-prompts') {
+            alert("Saving gallery items to folders other than 'My Saved Prompts' is not supported yet.");
+            return;
+        }
+
+        const title = window.prompt("Enter a title for your saved prompt:", `From Gallery Image ${image.id.substring(0, 4)}`);
+        if (title && title.trim()) {
+            const newSavedPrompt: UserSavedPrompt = {
+                id: `user-${crypto.randomUUID()}`,
+                title: title.trim(),
+                prompt: image.prompt,
+                timestamp: Date.now(),
+            };
+            // FIX: This robustly updates the state, triggering all necessary downstream effects.
+            setUserSavedPrompts(prevPrompts => [...prevPrompts, newSavedPrompt]);
+            alert(`Prompt "${title.trim()}" saved to "My Saved Prompts"!`);
+        }
+    };
+
+
     // --- AI Tools Handlers ---
     const handleDecodePrompt = useCallback(async (prompt: string) => {
         if (!ai) return;
@@ -607,6 +710,8 @@ const App = () => {
         const schema = {
             type: Type.OBJECT,
             properties: {
+                gender: { type: Type.STRING, description: "The gender of the subject, e.g., 'Female', 'Male'." },
+                ethnicity: { type: Type.STRING, description: "The ethnicity of the subject, e.g., 'East Asian'." },
                 dressStyle: { type: Type.STRING, description: "The style of dress, e.g., 'Hanfu', 'Qipao'." },
                 dressColor: { type: Type.STRING, description: "The primary color of the clothing." },
                 dressDetails: { type: Type.STRING, description: "Specific details about the clothing's appearance." },
@@ -617,6 +722,8 @@ const App = () => {
                 action: { type: Type.STRING, description: "The action or pose of the subject." },
                 gaze: { type: Type.STRING, description: "The direction of the subject's gaze." },
                 lighting: { type: Type.STRING, description: "The overall lighting style." },
+                shadowIntensity: { type: Type.STRING, description: "The intensity and style of shadows." },
+                highlightBloom: { type: Type.STRING, description: "The bloom or glow effect of highlights." },
                 shotPose: { type: Type.STRING, description: "The specific camera shot or pose composition." },
                 cameraModel: { type: Type.STRING, description: "The camera model used." },
                 lensType: { type: Type.STRING, description: "The camera lens type used." },
@@ -816,10 +923,25 @@ const App = () => {
             setIsRefreshing(false);
         }
     };
+    
+    // --- Prompt History Handlers ---
+    const handleSelectHistoryPrompt = (prompt: string) => {
+        setUserPrompt(prompt);
+        setUseStudioPrompt(false);
+    };
+
+    const handleClearPromptHistory = () => {
+        if (window.confirm("Are you sure you want to clear your entire prompt history? This cannot be undone.")) {
+            setPromptHistory([]);
+        }
+    };
 
     // --- Props for children ---
-    const creatorState = { userPrompt, studioPrompt, useStudioPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured: !!ai };
-    const creatorHandlers = { setUserPrompt, setUseStudioPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange };
+    // FIX: Define `isConfigured` based on whether the `ai` instance is available.
+    // This variable is used in child components to enable/disable AI features.
+    const isConfigured = !!ai;
+    const creatorState = { userPrompt, studioPrompt, useStudioPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured, promptHistory };
+    const creatorHandlers = { setUserPrompt, setUseStudioPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange, handleSelectHistoryPrompt, handleClearPromptHistory };
     const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
     const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt, handleSaveReverseEngineeredPrompt };
 
@@ -855,7 +977,7 @@ const App = () => {
             </nav>
             <div className="flex-grow min-h-0">
                 {activeTab === 'creator' && (
-                    <Creator state={creatorState} handlers={creatorHandlers} collection={collection} onSavePrompt={() => alert("Save Prompt to S3 not implemented yet.")} />
+                    <Creator state={creatorState} handlers={creatorHandlers} collection={collection} onSavePrompt={handleSaveCreatorPrompt} />
                 )}
                 {activeTab === 'gallery' && (
                     <Gallery 
@@ -864,7 +986,7 @@ const App = () => {
                         onUseSettings={handleUseSettings}
                         onUpscaleImage={handleUpscaleImage}
                         isUpscaling={isUpscaling}
-                        onAddToCollection={() => {}}
+                        onAddToCollection={handleSaveGalleryPromptToCollection}
                         collection={collection}
                     />
                 )}

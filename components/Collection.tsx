@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Collection as CollectionType, CollectionItem, StoredImage, TemplatePrompt } from '../utils/db';
+import { Collection as CollectionType, CollectionItem, StoredImage, TemplatePrompt, UserSavedPrompt } from '../utils/db';
 import { Loader } from './Loader';
 
 const TemplateEditor = ({ item, onSave, onCancel, onReset }: { item: CollectionItem, onSave: (item: CollectionItem) => void, onCancel: () => void, onReset: () => void }) => {
@@ -69,6 +69,21 @@ const CollectionItemCard: React.FC<{ item: CollectionItem; onEdit?: (item: Colle
                     <button disabled className="w-full text-xs bg-gray-700 text-white py-1 px-2 opacity-50 cursor-not-allowed">Move (N/A)</button>
                     <button disabled className="w-full text-xs bg-red-800 text-white py-1 px-2 opacity-50 cursor-not-allowed">Delete (N/A)</button>
                 </div>
+            </div>
+        );
+    }
+
+    if (type === 'user_saved_prompt') {
+        const promptContent = content as UserSavedPrompt;
+        return (
+            <div className="bg-gray-800 p-3 h-40 flex flex-col justify-between border-l-2 border-blue-400">
+                <div className="overflow-hidden">
+                    <p className="font-bold text-sm text-white truncate">{promptContent.title}</p>
+                    <p className="text-xs text-gray-400 mt-2 text-ellipsis overflow-hidden h-16">{promptContent.prompt}</p>
+                </div>
+                <button onClick={() => handleCopy(promptContent.prompt)} className="w-full text-xs bg-gray-700 hover:bg-gray-600 text-white py-1.5 px-2 transition mt-2">
+                    {isCopied ? 'Copied!' : '📋 Copy Prompt'}
+                </button>
             </div>
         );
     }
@@ -215,7 +230,7 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onAddDummyData
                     </button>
                 </div>
             </aside>
-            <main className="flex-grow bg-gray-900 p-4 overflow-y-auto relative">
+            <main className="flex-grow bg-gray-900 p-4 flex flex-col gap-4 relative">
                  {isRefreshing && !editingItem && (
                     <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
                         <Loader message="Refreshing from S3..." />
@@ -227,24 +242,30 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onAddDummyData
                 )}
 
                 {!editingItem && selectedFolder && (
-                    <div>
-                        <h3 className="text-lg font-bold mb-4">{selectedFolder.name}</h3>
-                        {selectedFolder.items.length > 0 ? (
-                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                {selectedFolder.items.map((item) => (
-                                    <CollectionItemCard key={item.id} item={item} onEdit={isTemplateFolder ? handleEditItem : undefined} />
-                                ))}
-                            </div>
-                        ) : (
-                             <div className="text-center text-gray-500 py-16">
-                                <p>This folder is empty.</p>
-                                {selectedFolder.id !== 's3-bucket-main' && <p className="text-sm mt-2">You can add new items to this collection.</p>}
-                            </div>
-                        )}
+                    <>
+                        <h3 className="text-lg font-bold flex-shrink-0">{selectedFolder.name}</h3>
+                        <div className="flex-grow overflow-y-auto pr-2">
+                            {selectedFolder.items.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                    {selectedFolder.items.map((item) => (
+                                        <CollectionItemCard key={item.id} item={item} onEdit={isTemplateFolder ? handleEditItem : undefined} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-center text-gray-500">
+                                    <div>
+                                        <p>This folder is empty.</p>
+                                        {selectedFolder.id !== 's3-bucket-main' && <p className="text-sm mt-2">You can add new items to this collection.</p>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         {isTemplateFolder && (
-                             <button onClick={handleCreateNewTemplate} className="mt-6 px-6 py-2 bg-gray-700 font-bold hover:bg-gray-600 transition">+ Create New Template</button>
+                             <div className="flex-shrink-0 pt-4 border-t border-gray-700">
+                                <button onClick={handleCreateNewTemplate} className="px-6 py-2 bg-gray-700 font-bold hover:bg-gray-600 transition">+ Create New Template</button>
+                             </div>
                         )}
-                    </div>
+                    </>
                 )}
                 
                 {!editingItem && !selectedFolder && (

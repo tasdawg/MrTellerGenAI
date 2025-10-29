@@ -7,6 +7,8 @@ export interface StoredImage {
 }
 
 export interface DecodedPrompt {
+    gender: string;
+    ethnicity: string;
     dressStyle: string;
     dressColor: string;
     dressDetails: string;
@@ -17,6 +19,8 @@ export interface DecodedPrompt {
     action: string;
     gaze: string;
     lighting: string;
+    shadowIntensity: string;
+    highlightBloom: string;
     shotPose: string;
     cameraModel: string;
     lensType: string;
@@ -38,12 +42,19 @@ export interface ReverseEngineeredPrompt {
     prompt: string;
 }
 
+export interface UserSavedPrompt {
+    id: string;
+    title: string;
+    prompt: string;
+    timestamp: number;
+}
+
 // --- NEW TYPES FOR COLLECTION ---
-export type CollectionItemContent = StoredImage | { title: string, prompt: string } | DecodedPrompt | TemplatePrompt;
+export type CollectionItemContent = StoredImage | { title: string, prompt: string } | DecodedPrompt | TemplatePrompt | UserSavedPrompt;
 
 export interface CollectionItem {
     id: string;
-    type: 'image' | 'prompt' | 'decoded_prompt' | 'template_prompt';
+    type: 'image' | 'prompt' | 'decoded_prompt' | 'template_prompt' | 'user_saved_prompt';
     timestamp: number;
     content: CollectionItemContent;
 }

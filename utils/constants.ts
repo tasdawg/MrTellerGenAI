@@ -2,6 +2,10 @@ export const REFERENCE_USAGE_OPTIONS = ["Use as Subject", "Use as Style", "Edit 
 export const ASPECT_RATIOS = ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"];
 
 // --- NEW CONSTANTS FOR PHOTOREALISM ---
+
+export const GENDERS = ['Female', 'Male'];
+export const ETHNICITIES = ['East Asian', 'Southeast Asian', 'South Asian', 'Caucasian', 'African', 'Hispanic', 'Middle Eastern'];
+
 export const CAMERA_MODELS = [
     "Canon EOS R5",
     "Sony Alpha a7R IV",
@@ -191,6 +195,23 @@ export const LIGHTING_PRESETS = [
     'Ominous under-lighting',
     'Warm, cozy fireplace glow'
 ];
+
+export const SHADOW_INTENSITY_OPTIONS = [
+    "soft and subtle shadows",
+    "natural, balanced shadows",
+    "deep, dramatic shadows",
+    "high-contrast, hard-edged shadows",
+    "no discernible shadows (flat lighting)"
+];
+
+export const HIGHLIGHT_BLOOM_OPTIONS = [
+    "crisp, sharp highlights with no bloom",
+    "gentle, soft highlight bloom",
+    "dreamy, ethereal highlight glow",
+    "strong, cinematic highlight bloom",
+    "muted, non-specular highlights"
+];
+
 export const BACKGROUND_ELEMENTS_PRESETS = [
     'Soldiers and swirling black smoke', 
     'Floating lanterns in a night sky', 
@@ -243,4 +264,10 @@ export const SHOT_POSES = [
     { name: "28. Water Reflection", value: "delicately touching the surface of water in a pond, creating ripples (85mm, f/1.8, reflection focus)"},
     { name: "29. Quiet Contemplation", value: "captured in a moment of quiet contemplation, reading a book by a window (50mm, f/2.2, natural light)"},
     { name: "30. Rooftop Dynamic", value: "a dynamic shot, her dress caught in the wind on a rooftop (24mm, f/8.0, wide-angle)"}
+];
+
+export const RANDOM_COLORS = [
+    'red', 'blue', 'green', 'black', 'white', 'yellow', 'purple', 'orange', 'pink',
+    'teal', 'cyan', 'magenta', 'lime', 'maroon', 'navy', 'olive', 'silver', 'gold',
+    'indigo', 'violet', 'coral', 'crimson', 'turquoise', 'plum', 'orchid', 'slate'
 ];
