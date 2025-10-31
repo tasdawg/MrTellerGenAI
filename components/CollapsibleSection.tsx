@@ -5,10 +5,10 @@ export const CollapsibleSection = ({ title, defaultOpen = false, children }: { t
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
     return (
-        <div className="border-t border-gray-600 pt-4">
+        <div className="border-t border-theme-border pt-4">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex justify-between items-center text-left text-sm font-medium text-gray-400 hover:text-white"
+                className="w-full flex justify-between items-center text-left text-sm font-medium text-theme-text-secondary hover:text-theme-text"
             >
                 <span>{title}</span>
                 <svg

@@ -4,7 +4,7 @@ import { Loader } from './Loader';
 import { renderFormControl } from '../utils/ui';
 
 export const AITools = ({ state, handlers, collection }: { state: any, handlers: any, collection: Collection }) => {
-    const { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt } = state;
+    const { isDecoding, decodedPromptJson, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt } = state;
     const { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt, handleSaveReverseEngineeredPrompt } = handlers;
 
     const [activeTool, setActiveTool] = useState('decoder'); // 'decoder' or 'reverse_engineer'
@@ -12,6 +12,7 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
     const [showSaveOptions, setShowSaveOptions] = useState(false);
     const [showSaveView, setShowSaveView] = useState(false);
     const [saveName, setSaveName] = useState('');
+    const [isPasting, setIsPasting] = useState(false);
 
 
     const onDecodeClick = () => {
@@ -33,6 +34,49 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
         e.target.value = ''; // Allow re-uploading the same file
     };
     
+    const handlePasteImage = async () => {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+            alert('Clipboard API not supported in this browser.');
+            return;
+        }
+        setIsPasting(true);
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            let imageFound = false;
+            for (const item of clipboardItems) {
+                const imageType = item.types.find(type => type.startsWith('image/'));
+                if (imageType) {
+                    imageFound = true;
+                    const blob = await item.getType(imageType);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setReverseEngineerImage(reader.result as string);
+                        setReverseEngineerImageMimeType(blob.type);
+                    };
+                    reader.onerror = () => {
+                         alert('Error reading the pasted image file.');
+                    }
+                    reader.readAsDataURL(blob);
+                    break; // Exit loop once image is found
+                }
+            }
+            if (!imageFound) {
+                alert('No image found on the clipboard. Please copy an image first (e.g., using Shift+Win+S).');
+            }
+        } catch (err: any) {
+            console.error('Failed to paste from clipboard:', err);
+            let errorMessage = 'Could not paste image. ';
+            if (err.name === 'NotAllowedError') {
+                errorMessage += 'Permission to access the clipboard was denied. Please check your browser settings and allow this page to read from the clipboard.';
+            } else {
+                errorMessage += 'An error occurred. Your browser might require you to grant permission, or the clipboard content may not be a supported image.';
+            }
+            alert(errorMessage);
+        } finally {
+            setIsPasting(false);
+        }
+    };
+
     const handleRemoveImage = () => {
         setReverseEngineerImage(null);
         setReverseEngineerImageMimeType('');
@@ -48,13 +92,18 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
             setSaveName('');
         }
     };
+    
+    const baseInputClasses = "w-full p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary";
+    const primaryButtonClasses = "px-6 py-2 bg-theme-primary text-white font-bold hover:bg-theme-primary-hover disabled:bg-theme-surface-2 disabled:text-theme-text-secondary disabled:cursor-not-allowed transition duration-300 rounded-md";
+    const secondaryButtonClasses = "px-6 py-2 bg-theme-surface-2 text-white font-semibold hover:bg-theme-border transition duration-300 disabled:opacity-50 rounded-md";
+
 
     const renderDecoder = () => (
         <div className="flex flex-col md:flex-row gap-4 h-full">
             {/* --- Left Panel: Decoder Input --- */}
-            <aside className="w-full md:w-1/2 lg:w-1/3 bg-gray-900 p-6 shadow-lg flex flex-col gap-6 overflow-y-auto">
+            <aside className="w-full md:w-1/2 lg:w-1/3 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg">
                 <h2 className="text-xl font-bold text-white">Prompt Decoder</h2>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-theme-text-secondary">
                     Paste a complex prompt below. The AI will analyze it and break it down into the categories used by the Photorealistic Studio.
                 </p>
 
@@ -63,33 +112,33 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                         value={promptToDecode}
                         onChange={(e) => setPromptToDecode(e.target.value)}
                         placeholder="e.g., A photorealistic image of a woman in a red, flowing Hanfu dress..."
-                        className="w-full h-48 p-2 bg-gray-800 border border-gray-600 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition"
+                        className={`${baseInputClasses} h-48`}
                     />
                 )}
                 
                 <button
                     onClick={onDecodeClick}
                     disabled={isDecoding || !promptToDecode.trim()}
-                    className="w-full px-6 py-3 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300 flex items-center justify-center gap-2"
+                    className={`${primaryButtonClasses} w-full flex items-center justify-center gap-2`}
                 >
-                    {isDecoding ? <div className="spinner !w-5 !h-5 !border-black"></div> : '🧩'}
+                    {isDecoding ? <div className="spinner !w-5 !h-5 !border-white"></div> : '🧩'}
                     Decode Prompt
                 </button>
             </aside>
 
             {/* --- Right Panel: Decoder Output --- */}
-            <main className="w-full md:w-1/2 lg:w-2/3 bg-gray-900 p-6 flex flex-col gap-6 overflow-y-auto">
+            <main className="w-full md:w-1/2 lg:w-2/3 bg-theme-surface p-6 flex flex-col gap-6 overflow-y-auto rounded-lg">
                 <h2 className="text-xl font-bold">Decoded Output</h2>
-                <div className="flex-grow bg-black/50 p-4 flex items-center justify-center min-h-0 relative">
+                <div className="flex-grow bg-theme-bg/50 p-4 flex items-center justify-center min-h-0 relative rounded-lg">
                     {isDecoding && <Loader message="Analyzing prompt..." />}
                     {!isDecoding && !decodedPromptJson && (
-                        <div className="text-center text-gray-500">
+                        <div className="text-center text-theme-text-secondary">
                             The structured output will appear here.
                         </div>
                     )}
                     {!isDecoding && decodedPromptJson && (
                         <div className="w-full h-full overflow-y-auto">
-                            <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all">
+                            <pre className="text-xs text-theme-text whitespace-pre-wrap break-all">
                                 {JSON.stringify(decodedPromptJson, null, 2)}
                             </pre>
                         </div>
@@ -97,37 +146,16 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                 </div>
                 <div className="relative flex items-center gap-4">
                     <button
-                        onClick={() => setShowSaveOptions(p => !p)}
-                        disabled={!decodedPromptJson || !s3Available}
-                        className="px-6 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
+                        disabled={true}
+                        className={secondaryButtonClasses}
+                        title="Saving decoded prompts is not supported in this version."
                     >
                         💾 Save to Collection
                     </button>
-                    {showSaveOptions && collection.folders.length > 0 && (
-                        <div className="absolute bottom-full left-0 mb-2 w-max bg-gray-600 shadow-lg z-10 text-center">
-                            <ul className="py-1">
-                                {collection.folders.map(folder => (
-                                    <li key={folder.id}>
-                                        <button
-                                            onClick={() => {
-                                                if (decodedPromptJson) {
-                                                    handleSaveDecodedPrompt(decodedPromptJson, folder.id);
-                                                    setShowSaveOptions(false);
-                                                }
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-500"
-                                        >
-                                            Save to "{folder.name}"
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
                     <button
                         onClick={() => handleApplyDecodedPrompt(decodedPromptJson)}
                         disabled={!decodedPromptJson}
-                        className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        className={primaryButtonClasses}
                     >
                         ⚙️ Use in Creator
                     </button>
@@ -139,27 +167,32 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
     const renderReverseEngineer = () => (
          <div className="flex flex-col md:flex-row gap-4 h-full">
             {/* --- Left Panel: Image Input --- */}
-            <aside className="w-full md:w-1/2 lg:w-1/3 bg-gray-900 p-6 shadow-lg flex flex-col gap-6 overflow-y-auto">
+            <aside className="w-full md:w-1/2 lg:w-1/3 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg">
                 <h2 className="text-xl font-bold text-white">Prompt Reverse Engineer</h2>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-theme-text-secondary">
                     Upload an image and the AI will generate a highly detailed, creative prompt inspired by it, based on a template of professional prompts.
                 </p>
 
                  <div className="space-y-3">
-                    <label className="text-sm font-medium text-gray-400">Reference Image</label>
+                    <label className="text-sm font-medium text-theme-text-secondary">Reference Image</label>
                     {reverseEngineerImage ? (
                         <div className="relative group">
-                            <img src={reverseEngineerImage} alt="Reference for reverse engineering" className="w-full" />
-                            <button onClick={handleRemoveImage} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 hover:bg-black/80 transition-opacity opacity-0 group-hover:opacity-100" aria-label="Remove image">
+                            <img src={reverseEngineerImage} alt="Reference for reverse engineering" className="w-full rounded-md" />
+                            <button onClick={handleRemoveImage} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 hover:bg-black/80 transition-opacity opacity-0 group-hover:opacity-100 rounded-full" aria-label="Remove image">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
                     ) : (
                         <>
                             <input type="file" id="reverse-engineer-upload" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handleImageUpload} />
-                            <label htmlFor="reverse-engineer-upload" className="w-full text-center cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 transition duration-300 block">
-                                🖼️ Upload Image
-                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <label htmlFor="reverse-engineer-upload" className="w-full text-center cursor-pointer bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 flex items-center justify-center rounded-md">
+                                    🖼️ Upload
+                                </label>
+                                <button onClick={handlePasteImage} disabled={isPasting} className="w-full text-center cursor-pointer bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 flex items-center justify-center disabled:opacity-50 rounded-md">
+                                    {isPasting ? 'Pasting...' : '📋 Paste'}
+                                </button>
+                            </div>
                         </>
                     )}
                 </div>
@@ -167,21 +200,21 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                 <button
                     onClick={handleReverseEngineerPrompt}
                     disabled={isReverseEngineering || !reverseEngineerImage}
-                    className="w-full px-6 py-3 bg-gray-300 text-black font-bold hover:bg-gray-400 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition duration-300 flex items-center justify-center gap-2"
+                    className={`${primaryButtonClasses} w-full flex items-center justify-center gap-2`}
                 >
-                    {isReverseEngineering ? <div className="spinner !w-5 !h-5 !border-black"></div> : '🛠️'}
+                    {isReverseEngineering ? <div className="spinner !w-5 !h-5 !border-white"></div> : '🛠️'}
                     Reverse Engineer Prompt
                 </button>
             </aside>
 
             {/* --- Right Panel: Generated Prompt Output --- */}
-            <main className="w-full md:w-1/2 lg:w-2/3 bg-gray-900 p-6 flex flex-col gap-6 overflow-y-auto">
+            <main className="w-full md:w-1/2 lg:w-2/3 bg-theme-surface p-6 flex flex-col gap-6 overflow-y-auto rounded-lg">
                 <h2 className="text-xl font-bold">Generated Prompt</h2>
-                <div className="flex-grow bg-black/50 p-4 flex items-center justify-center min-h-0 relative">
+                <div className="flex-grow bg-theme-bg/50 p-4 flex items-center justify-center min-h-0 relative rounded-lg">
                     {isReverseEngineering && !reverseEngineeredPrompt && <Loader message="Generating prompt from image..." />}
                     
                     {!isReverseEngineering && !reverseEngineeredPrompt && (
-                        <div className="text-center text-gray-500">
+                        <div className="text-center text-theme-text-secondary">
                             The generated prompt will appear here.
                         </div>
                     )}
@@ -190,7 +223,7 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                         <textarea
                             readOnly
                             value={reverseEngineeredPrompt}
-                            className="w-full h-full p-3 bg-gray-800 border border-gray-600 resize-none font-mono text-xs"
+                            className="w-full h-full p-3 bg-theme-surface border border-theme-border rounded-md resize-none font-mono text-xs"
                         />
                     )}
                 </div>
@@ -199,27 +232,27 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                          <button
                             onClick={() => navigator.clipboard.writeText(reverseEngineeredPrompt)}
                             disabled={!reverseEngineeredPrompt}
-                            className="px-6 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
+                            className={secondaryButtonClasses}
                         >
                             📋 Copy Prompt
                         </button>
                         <button
                             onClick={() => { setShowSaveView(true); setSaveName(''); }}
                             disabled={!reverseEngineeredPrompt}
-                            className="px-6 py-2 bg-gray-700 text-white font-semibold hover:bg-gray-600 transition duration-300 disabled:opacity-50"
+                            className={secondaryButtonClasses}
                         >
                             💾 Save Prompt
                         </button>
                         <button
                             onClick={handleApplyReverseEngineeredPrompt}
                             disabled={!reverseEngineeredPrompt}
-                            className="px-6 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400 transition duration-300 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"
+                            className={primaryButtonClasses}
                         >
                             ⚙️ Use in Creator
                         </button>
                     </div>
                     {showSaveView && (
-                        <div className="mt-4 p-4 bg-gray-800 space-y-3">
+                        <div className="mt-4 p-4 bg-theme-bg/50 space-y-3 rounded-lg">
                              <p className="text-sm font-semibold">Save to "Reverse Engineered Prompts"</p>
                              <div className="flex items-center gap-2">
                                 <input 
@@ -227,11 +260,11 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                                     value={saveName} 
                                     onChange={(e) => setSaveName(e.target.value)} 
                                     placeholder="Enter a name for this prompt"
-                                    className="flex-grow p-2 bg-gray-700 border border-gray-600"
+                                    className={`${baseInputClasses} flex-grow`}
                                     aria-label="Prompt name"
                                 />
-                                <button onClick={handleConfirmSaveReversePrompt} className="px-4 py-2 bg-gray-300 text-black font-bold hover:bg-gray-400">Save</button>
-                                <button onClick={() => setShowSaveView(false)} className="px-4 py-2 bg-gray-900 hover:bg-black font-bold">Cancel</button>
+                                <button onClick={handleConfirmSaveReversePrompt} className={primaryButtonClasses}>Save</button>
+                                <button onClick={() => setShowSaveView(false)} className={`${secondaryButtonClasses} bg-theme-border`}>Cancel</button>
                             </div>
                         </div>
                     )}
@@ -241,13 +274,13 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
     );
 
     return (
-        <div className="flex flex-col h-full bg-black/50 p-6">
-            <div className="flex-shrink-0 border-b border-gray-700 mb-4">
+        <div className="flex flex-col h-full bg-theme-bg/50 p-6 rounded-lg">
+            <div className="flex-shrink-0 border-b border-theme-border mb-4">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                    <button onClick={() => setActiveTool('decoder')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${activeTool === 'decoder' ? 'border-gray-300 text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-400'}`}>
+                    <button onClick={() => setActiveTool('decoder')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${activeTool === 'decoder' ? 'border-theme-primary text-theme-text' : 'border-transparent text-theme-text-secondary hover:text-theme-text hover:border-theme-accent'}`}>
                         Prompt Decoder
                     </button>
-                    <button onClick={() => setActiveTool('reverse_engineer')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${activeTool === 'reverse_engineer' ? 'border-gray-300 text-gray-200' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-400'}`}>
+                    <button onClick={() => setActiveTool('reverse_engineer')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${activeTool === 'reverse_engineer' ? 'border-theme-primary text-theme-text' : 'border-transparent text-theme-text-secondary hover:text-theme-text hover:border-theme-accent'}`}>
                         Prompt Reverse Engineer
                     </button>
                 </nav>

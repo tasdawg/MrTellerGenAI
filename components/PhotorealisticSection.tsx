@@ -58,6 +58,8 @@ export const PhotorealisticSection = ({ settings, onSettingsChange }: Photoreali
         onSettingsChange(randomSettings);
     };
 
+    const baseInputClasses = "w-full p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary";
+
     // Get the clothing detail options for the currently selected style.
     const dressDetailOptions: string[] = (CLOTHING_DETAILS_MAP as any)[settings.dressStyle] || [];
     // Ensure the currently set detail is in the list (for loading from localStorage).
@@ -94,53 +96,53 @@ export const PhotorealisticSection = ({ settings, onSettingsChange }: Photoreali
 
     return (
         <div className="space-y-4">
-            <p className="text-xs text-gray-400">This tool helps construct a detailed prompt for Chinese and Vietnamese cultural styles. For best results, upload a clear 'Subject Reference' image first. The prompt will update in real-time in the generation box.</p>
+            <p className="text-xs text-theme-text-secondary">This tool helps construct a detailed prompt for Chinese and Vietnamese cultural styles. For best results, upload a clear 'Subject Reference' image first. The prompt will update in real-time in the generation box.</p>
             <button 
                 onClick={handleRandomize}
-                className="w-full mb-2 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white font-bold transition duration-300 flex items-center justify-center gap-2"
+                className="w-full mb-2 py-2 px-4 bg-theme-surface-2 hover:bg-theme-border text-white font-bold transition duration-300 flex items-center justify-center gap-2 rounded-md"
             >
                 🎲 Randomize All Settings
             </button>
 
-            <div className="space-y-4 border-b border-gray-700 pb-4 mb-4">
+            <div className="space-y-4 border-b border-theme-border pb-4 mb-4">
                 <h3 className="text-base font-semibold text-white">Subject</h3>
-                {renderFormControl("Gender", <select name="gender" value={settings.gender} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {GENDERS.map(s => <option key={s}>{s}</option>)} </select>)}
-                {renderFormControl("Ethnicity", <select name="ethnicity" value={settings.ethnicity} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {ETHNICITIES.map(s => <option key={s}>{s}</option>)} </select>)}
+                {renderFormControl("Gender", <select name="gender" value={settings.gender} onChange={handleChange} className={baseInputClasses}> {GENDERS.map(s => <option key={s}>{s}</option>)} </select>)}
+                {renderFormControl("Ethnicity", <select name="ethnicity" value={settings.ethnicity} onChange={handleChange} className={baseInputClasses}> {ETHNICITIES.map(s => <option key={s}>{s}</option>)} </select>)}
             </div>
 
              <h3 className="text-base font-semibold text-white">Styling &amp; Environment</h3>
             
-            {renderFormControl("Clothing Style", <select name="dressStyle" value={settings.dressStyle} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {DRESS_STYLES.map(s => <option key={s}>{s}</option>)} </select>)}
-            {renderFormControl("Clothing Color", <input type="text" name="dressColor" value={settings.dressColor} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"/>)}
-            {renderFormControl("Clothing Details", <select name="dressDetails" value={settings.dressDetails} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{dressDetailOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>)}
-            {renderFormControl("Hair Style", <select name="hairStyle" value={settings.hairStyle} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{hairStyleOptions.map(s => <option key={s}>{s}</option>)}</select>)}
-            {renderFormControl("Hair Accessory", <select name="hairAccessory" value={settings.hairAccessory} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{hairAccessoryOptions.map(s => <option key={s}>{s}</option>)}</select>)}
-            {renderFormControl("Background Setting", <select name="background" value={settings.background} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {BACKGROUND_SETTINGS.map(s => <option key={s}>{s}</option>)} </select>)}
-            {renderFormControl("Background Elements", <select name="backgroundElements" value={settings.backgroundElements} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {BACKGROUND_ELEMENTS_PRESETS.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Clothing Style", <select name="dressStyle" value={settings.dressStyle} onChange={handleChange} className={baseInputClasses}> {DRESS_STYLES.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Clothing Color", <input type="text" name="dressColor" value={settings.dressColor} onChange={handleChange} className={baseInputClasses}/>)}
+            {renderFormControl("Clothing Details", <select name="dressDetails" value={settings.dressDetails} onChange={handleChange} className={baseInputClasses}>{dressDetailOptions.map(s => <option key={s} value={s}>{s}</option>)}</select>)}
+            {renderFormControl("Hair Style", <select name="hairStyle" value={settings.hairStyle} onChange={handleChange} className={baseInputClasses}>{hairStyleOptions.map(s => <option key={s}>{s}</option>)}</select>)}
+            {renderFormControl("Hair Accessory", <select name="hairAccessory" value={settings.hairAccessory} onChange={handleChange} className={baseInputClasses}>{hairAccessoryOptions.map(s => <option key={s}>{s}</option>)}</select>)}
+            {renderFormControl("Background Setting", <select name="background" value={settings.background} onChange={handleChange} className={baseInputClasses}> {BACKGROUND_SETTINGS.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Background Elements", <select name="backgroundElements" value={settings.backgroundElements} onChange={handleChange} className={baseInputClasses}> {BACKGROUND_ELEMENTS_PRESETS.map(s => <option key={s}>{s}</option>)} </select>)}
             
-            <h3 className="text-base font-semibold text-white pt-4 border-t border-gray-700">Composition &amp; Cinematography</h3>
+            <h3 className="text-base font-semibold text-white pt-4 border-t border-theme-border">Composition &amp; Cinematography</h3>
 
-            {renderFormControl("Shot Pose", <select name="shotPose" value={settings.shotPose} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {SHOT_POSES.map(s => <option key={s.name} value={s.value}>{s.name}</option>)} </select>)}
+            {renderFormControl("Shot Pose", <select name="shotPose" value={settings.shotPose} onChange={handleChange} className={baseInputClasses}> {SHOT_POSES.map(s => <option key={s.name} value={s.value}>{s.name}</option>)} </select>)}
             
             {settings.shotPose === 'Custom Pose' && (
                 <>
-                    {renderFormControl("Action / Pose", <textarea name="action" value={settings.action} onChange={handleChange} className="w-full h-20 p-2 bg-gray-800 border border-gray-600"/>)}
-                    {renderFormControl("Gaze", <select name="gaze" value={settings.gaze} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {GAZE_OPTIONS.map(s => <option key={s}>{s}</option>)} </select>)}
+                    {renderFormControl("Action / Pose", <textarea name="action" value={settings.action} onChange={handleChange} className={`${baseInputClasses} h-20`}/>)}
+                    {renderFormControl("Gaze", <select name="gaze" value={settings.gaze} onChange={handleChange} className={baseInputClasses}> {GAZE_OPTIONS.map(s => <option key={s}>{s}</option>)} </select>)}
                 </>
             )}
 
-            {renderFormControl("Camera Model", <select name="cameraModel" value={settings.cameraModel} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {CAMERA_MODELS.map(s => <option key={s}>{s}</option>)} </select>)}
-            {renderFormControl("Lens Style", <select name="lensType" value={settings.lensType} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {LENS_TYPES.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Camera Model", <select name="cameraModel" value={settings.cameraModel} onChange={handleChange} className={baseInputClasses}> {CAMERA_MODELS.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Lens Style", <select name="lensType" value={settings.lensType} onChange={handleChange} className={baseInputClasses}> {LENS_TYPES.map(s => <option key={s}>{s}</option>)} </select>)}
 
-            {renderFormControl("Lighting", <select name="lighting" value={settings.lighting} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {LIGHTING_PRESETS.map(s => <option key={s}>{s}</option>)} </select>)}
-            {renderFormControl("Shadow Intensity", <select name="shadowIntensity" value={settings.shadowIntensity} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{shadowIntensityOptions.map(s => <option key={s}>{s}</option>)}</select>)}
-            {renderFormControl("Highlight Bloom", <select name="highlightBloom" value={settings.highlightBloom} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{highlightBloomOptions.map(s => <option key={s}>{s}</option>)}</select>)}
+            {renderFormControl("Lighting", <select name="lighting" value={settings.lighting} onChange={handleChange} className={baseInputClasses}> {LIGHTING_PRESETS.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Shadow Intensity", <select name="shadowIntensity" value={settings.shadowIntensity} onChange={handleChange} className={baseInputClasses}>{shadowIntensityOptions.map(s => <option key={s}>{s}</option>)}</select>)}
+            {renderFormControl("Highlight Bloom", <select name="highlightBloom" value={settings.highlightBloom} onChange={handleChange} className={baseInputClasses}>{highlightBloomOptions.map(s => <option key={s}>{s}</option>)}</select>)}
             
-            <h3 className="text-base font-semibold text-white pt-4 border-t border-gray-700">Final Details</h3>
+            <h3 className="text-base font-semibold text-white pt-4 border-t border-theme-border">Final Details</h3>
 
-            {renderFormControl("Skin Details", <select name="skin" value={settings.skin} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{skinDetailOptions.map(s => <option key={s}>{s}</option>)}</select>)}
-            {renderFormControl("Fashion Aesthetics", <select name="fashionAesthetics" value={settings.fashionAesthetics} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600">{fashionAestheticOptions.map(s => <option key={s}>{s}</option>)}</select>)}
-            {renderFormControl("Aspect Ratio", <select name="aspectRatio" value={settings.aspectRatio} onChange={handleChange} className="w-full p-2 bg-gray-800 border border-gray-600"> {ASPECT_RATIOS.map(s => <option key={s}>{s}</option>)} </select>)}
+            {renderFormControl("Skin Details", <select name="skin" value={settings.skin} onChange={handleChange} className={baseInputClasses}>{skinDetailOptions.map(s => <option key={s}>{s}</option>)}</select>)}
+            {renderFormControl("Fashion Aesthetics", <select name="fashionAesthetics" value={settings.fashionAesthetics} onChange={handleChange} className={baseInputClasses}>{fashionAestheticOptions.map(s => <option key={s}>{s}</option>)}</select>)}
+            {renderFormControl("Aspect Ratio", <select name="aspectRatio" value={settings.aspectRatio} onChange={handleChange} className={baseInputClasses}> {ASPECT_RATIOS.map(s => <option key={s}>{s}</option>)} </select>)}
         </div>
     );
 };

@@ -1,5 +1,7 @@
 {
   "name": "Copy of image gen",
   "description": "An empty app",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "clipboard-read"
+  ]
 }

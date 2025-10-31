@@ -12,20 +12,21 @@
         }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000000; /* bg-black */
+            background-color: #111827; /* theme-bg */
         }
         /* Custom scrollbar for a better look */
         ::-webkit-scrollbar {
             width: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #111827;
+            background: #111827; /* theme-bg */
         }
         ::-webkit-scrollbar-thumb {
-            background: #4b5563;
+            background: #374151; /* theme-surface-2 */
+            border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #6b7280;
+            background: #4f46e5; /* theme-primary */
         }
         /* Simple spinner animation */
         .spinner {
@@ -52,8 +53,25 @@
   }
 }
 </script>
-<!-- Added AWS SDK for S3 integration -->
-<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1641.0.min.js"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'theme-bg': '#111827',
+            'theme-surface': '#1f2937',
+            'theme-surface-2': '#374151',
+            'theme-primary': '#4f46e5',
+            'theme-primary-hover': '#4338ca',
+            'theme-accent': '#818cf8',
+            'theme-text': '#e5e7eb',
+            'theme-text-secondary': '#9ca3af',
+            'theme-border': '#374151',
+          }
+        }
+      }
+    }
+  </script>
 </head>
 <body>
     <div id="root"></div>

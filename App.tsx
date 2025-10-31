@@ -1,44 +1,25 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { GoogleGenAI, Modality, Type, Chat } from "@google/genai";
 import { StoredImage, Collection, CollectionFolder, CollectionItem, DecodedPrompt, TemplatePrompt, ReverseEngineeredPrompt, UserSavedPrompt } from './utils/db';
-import { uploadToS3, listFromS3, getFromS3, base64ToBlob, getPublicUrl, setS3Config } from './utils/s3';
-import { CONFIG } from './utils/config';
+import { setApiConfig, uploadFile, saveJson } from './utils/api';
+import { base64ToBlob } from './utils/helpers';
 import { DRESS_STYLES, BACKGROUND_SETTINGS, GAZE_OPTIONS, LIGHTING_PRESETS, BACKGROUND_ELEMENTS_PRESETS, SHOT_POSES, CAMERA_MODELS, LENS_TYPES, CLOTHING_DETAILS_MAP, HAIR_STYLES, HAIR_ACCESSORIES, SKIN_DETAILS, FASHION_AESTHETICS, SHADOW_INTENSITY_OPTIONS, HIGHLIGHT_BLOOM_OPTIONS, GENDERS, ETHNICITIES } from './utils/constants';
 import { Creator } from './components/Creator';
 import { Gallery } from './components/Gallery';
 import { Collection as CollectionComponent } from './components/Collection';
 import { AITools } from './components/AITools';
 import { SettingsModal } from './components/SettingsModal';
+import { AjaxUploader } from './components/AjaxUploader';
 
 
-// --- HELPER FOR S3 ERROR DIAGNOSIS ---
-const getS3ErrorMessage = (e: any): string => {
+const getApiErrorMessage = (e: any): string => {
     const errorMessage = e.message || 'An unknown error occurred.';
-    if (errorMessage.toLowerCase().includes('network failure')) {
+    if (errorMessage.toLowerCase().includes('failed to fetch')) {
         const origin = window.location.origin;
-        const corsPolicy = `
-[
-  {
-    "AllowedOrigins": ["*"],
-    "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": [],
-    "MaxAgeSeconds": 3000
-  }
-]`;
-        return `Network Failure: This is a CORS issue. Your MiniIO server must be configured to allow requests from this app.
-
-ACTION REQUIRED:
-Apply the following CORS policy to your 'image-gen' bucket on the MiniIO server:
-------------------------------------------
-${corsPolicy.trim()}
-------------------------------------------
-
-After applying this, refresh the page.
+        return `Network Failure: This is likely a CORS issue. Your API server must be configured to allow requests from this app.
 (App Origin: ${origin})
-`;
+
+Check the browser's developer console for more details.`;
     }
     return errorMessage;
 };
@@ -114,14 +95,14 @@ const App = () => {
     const [strictFaceLock, setStrictFaceLock] = useState(initialCreatorState?.strictFaceLock ?? true);
     const [strictHairLock, setStrictHairLock] = useState(initialCreatorState?.strictHairLock ?? true);
 
-    // Gallery State
+    // Gallery State (now sourced from localStorage)
     const [isUpscaling, setIsUpscaling] = useState(false);
     const [savedImages, setSavedImages] = useState<StoredImage[]>([]);
+    const [galleryItems, setGalleryItems] = useState<StoredImage[]>([]);
 
     // Collection State
     const [collection, setCollection] = useState<Collection>({ folders: [] });
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [s3Items, setS3Items] = useState<CollectionItem[]>([]);
     const [templatePrompts, setTemplatePrompts] = useState<TemplatePrompt[]>([]);
     const [savedReversePrompts, setSavedReversePrompts] = useState<ReverseEngineeredPrompt[]>([]);
     const [userSavedPrompts, setUserSavedPrompts] = useState<UserSavedPrompt[]>([]);
@@ -135,6 +116,12 @@ const App = () => {
     const [reverseEngineerImageMimeType, setReverseEngineerImageMimeType] = useState('');
     const [isReverseEngineering, setIsReverseEngineering] = useState(false);
     const [reverseEngineeredPrompt, setReverseEngineeredPrompt] = useState('');
+
+    // Chat Optimizer State
+    const [optimizerChat, setOptimizerChat] = useState<Chat | null>(null);
+    const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
+    const [isOptimizing, setIsOptimizing] = useState(false);
+    const [optimizerSystemPrompt, setOptimizerSystemPrompt] = useState(initialCreatorState?.optimizerSystemPrompt ?? "You are an expert prompt optimizer for an advanced image generation AI. Your task is to take the user's simple idea or keywords and transform it into a rich, detailed, and evocative prompt. Maintain the core concepts from the user's input, but expand upon them by adding cinematic details, lighting descriptions, artistic styles, and specific composition elements. The final output should be only the optimized prompt, ready to be used for image generation.");
 
 
     // Photorealistic Studio State (lifted from component)
@@ -162,15 +149,17 @@ const App = () => {
     });
 
 
-    // S3 & Settings State
-    const [s3Config, setS3ConfigState] = useState(CONFIG.s3);
+    // API & Settings State
+    const [apiConfig, setApiConfigState] = useState({
+        baseUrl: 'https://fastapi.mrteller.win',
+        apiKey: ''
+    });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [s3Available, setS3Available] = useState(true);
 
 
-    // --- S3 & API KEY CONFIGURATION HANDLING ---
+    // --- API KEY & CONFIGURATION HANDLING ---
     useEffect(() => {
-        // Load API Key from localStorage on initial load
+        // Load Gemini API Key from localStorage
         const savedApiKey = localStorage.getItem('gemini-api-key');
         if (savedApiKey) {
             setApiKey(savedApiKey);
@@ -179,19 +168,17 @@ const App = () => {
             setIsSettingsModalOpen(true);
         }
 
-        // Load S3 config from localStorage on initial load
+        // Load custom API config from localStorage
         try {
-            const savedS3Config = localStorage.getItem('s3-config');
-            if (savedS3Config) {
-                const parsedConfig = JSON.parse(savedS3Config);
-                setS3ConfigState(parsedConfig);
+            const savedApiConfig = localStorage.getItem('api-config');
+            if (savedApiConfig) {
+                const parsedConfig = JSON.parse(savedApiConfig);
+                setApiConfigState(parsedConfig);
             } else {
-                setError(prev => prev ? `${prev}\n\nS3 is not configured. Go to Settings > S3 Storage to set it up.` : "S3 is not configured. Please go to the Collection tab to set it up.");
-                setS3Available(false);
+                setError(prev => prev ? `${prev}\n\nYour custom API is not configured. Go to Settings to set it up.` : "Your custom API is not configured. Go to Settings to set it up.");
             }
         } catch (e) {
-            console.error("Failed to load S3 config from localStorage", e);
-            setS3ConfigState(CONFIG.s3);
+            console.error("Failed to load API config from localStorage", e);
         }
 
         // Load local prompt collections from localStorage
@@ -222,9 +209,9 @@ const App = () => {
     }, []);
 
     useEffect(() => {
-        // Whenever s3Config state changes, update the s3 utility
-        setS3Config(s3Config);
-    }, [s3Config]);
+        // Whenever apiConfig state changes, update the api utility
+        setApiConfig(apiConfig);
+    }, [apiConfig]);
     
      useEffect(() => {
         if (apiKey) {
@@ -245,101 +232,62 @@ const App = () => {
         }
     }, [apiKey, error]);
     
-    const handleSaveSettings = useCallback(({ apiKey: newApiKey, s3Config: newS3Config }) => {
-        // Save and update API Key
+    // Initialize Chat Optimizer instance when AI is ready
+    useEffect(() => {
+        if (ai) {
+            const chat = ai.chats.create({
+                model: 'gemini-2.5-flash',
+                config: {
+                    systemInstruction: optimizerSystemPrompt,
+                }
+            });
+            setOptimizerChat(chat);
+            setChatHistory([]); // Clear history on re-initialization
+        }
+    }, [ai, optimizerSystemPrompt]);
+
+    const handleSaveSettings = useCallback(({ apiKey: newApiKey, apiConfig: newApiConfig }) => {
+        // Save and update Gemini API Key
         setApiKey(newApiKey);
         localStorage.setItem('gemini-api-key', newApiKey);
 
-        // Save and update S3 Config
-        setS3ConfigState(newS3Config);
-        localStorage.setItem('s3-config', JSON.stringify(newS3Config));
+        // Save and update Custom API Config
+        setApiConfigState(newApiConfig);
+        localStorage.setItem('api-config', JSON.stringify(newApiConfig));
         
         setIsSettingsModalOpen(false);
-        
-        // Automatically trigger a refresh to test the new S3 config
         handleRefresh();
     }, []);
 
 
-    // --- S3 DATA HANDLING ---
+    // --- DATA HANDLING (from localStorage) ---
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
         setError(null);
-
         try {
-            const objects = await listFromS3();
-            const allItems: CollectionItem[] = [];
-
-            await Promise.all(
-                objects.map(async (file) => {
-                    const uuid = file.Key.split('-').pop().replace('.json', '');
-                    const id = `item-${uuid}`;
-
-                    if (file.Key.startsWith('prompt-')) {
-                        const jsonContent = await getFromS3(file.Key);
-                        const data = JSON.parse(jsonContent);
-                        const imageKey = `image-${uuid}.jpg`;
-                        const imageUrl = getPublicUrl(imageKey);
-                        
-                        const imageItem: StoredImage = {
-                            id: uuid,
-                            src: imageUrl,
-                            prompt: data.prompt,
-                            settings: data.settings,
-                            timestamp: data.timestamp,
-                        };
-
-                        allItems.push({
-                            id,
-                            type: 'image',
-                            timestamp: data.timestamp,
-                            content: imageItem,
-                        });
-                    } else if (file.Key.startsWith('decoded-prompt-')) {
-                         const jsonContent = await getFromS3(file.Key);
-                         const data = JSON.parse(jsonContent);
-                         allItems.push({
-                            id,
-                            type: 'decoded_prompt',
-                            timestamp: data.timestamp,
-                            content: data.content as DecodedPrompt,
-                         });
-                    }
-                })
-            );
-
-            allItems.sort((a, b) => b.timestamp - a.timestamp);
+            // The API spec doesn't provide a file list endpoint.
+            // We rely on localStorage as the source of truth for the gallery.
+            const savedItemsJSON = localStorage.getItem('galleryItems');
+            const savedItems: StoredImage[] = savedItemsJSON ? JSON.parse(savedItemsJSON) : [];
             
-            setS3Items(allItems);
-            
-            const galleryImages = allItems
-                .filter(item => item.type === 'image')
-                .map(item => item.content as StoredImage);
-            setSavedImages(galleryImages);
+            const sortedItems = savedItems.sort((a, b) => b.timestamp - a.timestamp);
 
-            setS3Available(true);
+            setGalleryItems(sortedItems);
+            setSavedImages(sortedItems);
 
         } catch (e: any) {
-            console.error("Failed to refresh from S3", e);
-            setS3Available(wasAvailable => {
-                if (wasAvailable) {
-                    setError(`S3 Connection Failed: ${getS3ErrorMessage(e)}. Images will now be stored in-memory for this session. Please check your S3 configuration in Settings.`);
-                }
-                return false;
-            });
+            console.error("Failed to refresh from localStorage", e);
+            setError(`Failed to load gallery from local storage: ${e.message}. Data might be corrupted.`);
+            setGalleryItems([]);
             setSavedImages([]);
-            setS3Items([]);
         } finally {
             setIsRefreshing(false);
         }
     }, []);
 
-    // Initial load from S3 after config is settled
+    // Initial load
     useEffect(() => {
-        const timer = setTimeout(() => {
-            handleRefresh();
-        }, 100);
-        return () => clearTimeout(timer);
+        handleRefresh();
     }, [handleRefresh]);
 
     // Save creator state to localStorage whenever it changes
@@ -352,6 +300,7 @@ const App = () => {
             strictFaceLock,
             strictHairLock,
             photorealisticSettings,
+            optimizerSystemPrompt,
         };
         try {
             localStorage.setItem('gemini-creator-state', JSON.stringify(creatorStateToSave));
@@ -362,7 +311,7 @@ const App = () => {
         userPrompt, useStudioPrompt,
         subjectReferenceImage, subjectReferenceImageMimeType,
         strictFaceLock, strictHairLock,
-        photorealisticSettings
+        photorealisticSettings, optimizerSystemPrompt
     ]);
     
     // Save user prompts to localStorage whenever they change
@@ -389,7 +338,6 @@ const App = () => {
         const userSavedFolder: CollectionFolder = {
             id: 'user-saved-prompts',
             name: 'My Saved Prompts',
-            // FIX: Add a return type to the map function to ensure the 'type' property is a literal, not a string. This resolves the TypeScript error.
             items: userSavedPrompts.map((p): CollectionItem => ({
                 id: p.id,
                 type: 'user_saved_prompt',
@@ -401,11 +349,10 @@ const App = () => {
         const templateFolder: CollectionFolder = {
             id: 'ai-prompt-templates',
             name: 'AI Prompt Templates',
-            // FIX: Add a return type for consistency and to prevent potential type-widening issues.
             items: templatePrompts.map((p): CollectionItem => ({
                 id: p.id,
                 type: 'template_prompt',
-                timestamp: 0, // Not sorted by time
+                timestamp: 0,
                 content: p,
             })),
         };
@@ -413,7 +360,6 @@ const App = () => {
         const reverseEngineeredFolder: CollectionFolder = {
             id: 'reverse-engineered-prompts',
             name: 'Reverse Engineered Prompts',
-            // FIX: Use a return type for consistency, replacing the previous type assertion.
             items: savedReversePrompts.map((p): CollectionItem => ({
                 id: p.id,
                 type: 'prompt',
@@ -422,19 +368,21 @@ const App = () => {
             })).sort((a, b) => b.timestamp - a.timestamp)
         };
         
-        const s3Folder: CollectionFolder = {
-             id: 's3-bucket-main',
-             name: 'S3 Bucket',
-             items: s3Items
+        const cloudStorageFolder: CollectionFolder = {
+             id: 'cloud-storage',
+             name: 'Cloud Storage',
+             items: galleryItems.map((item): CollectionItem => ({
+                id: item.id,
+                type: 'image',
+                timestamp: item.timestamp,
+                content: item,
+            }))
         };
         
-        const folders = [userSavedFolder, templateFolder, reverseEngineeredFolder];
-        if (s3Items.length > 0 || s3Available) {
-            folders.push(s3Folder);
-        }
-
+        const folders = [userSavedFolder, templateFolder, reverseEngineeredFolder, cloudStorageFolder];
+        
         setCollection({ folders });
-    }, [templatePrompts, savedReversePrompts, s3Items, s3Available, userSavedPrompts]);
+    }, [templatePrompts, savedReversePrompts, userSavedPrompts, galleryItems]);
 
     // --- AUTOMATIC PROMPT GENERATION ---
     useEffect(() => {
@@ -465,10 +413,8 @@ const App = () => {
         if (!prompt || prompt.trim() === '') return;
         
         setPromptHistory(prevHistory => {
-            // Remove the prompt if it already exists to move it to the top
             const filteredHistory = prevHistory.filter(p => p !== prompt);
             const newHistory = [prompt, ...filteredHistory];
-            // Limit history size to 50 entries
             return newHistory.slice(0, 50); 
         });
     };
@@ -484,45 +430,51 @@ const App = () => {
         setError(null);
 
         const uploadOrSaveImages = async (imageSrcs: string[]) => {
-            const saveToMemory = () => {
-                const newStoredImages: StoredImage[] = imageSrcs.map(src => ({
-                    id: crypto.randomUUID(),
-                    src: src, // The base64 data URL
-                    prompt: promptToUse,
-                    settings: { photorealisticSettings },
-                    timestamp: Date.now(),
-                }));
-                setSavedImages(prevImages => [...newStoredImages, ...prevImages]);
-            };
-
-            if (!s3Available) {
-                saveToMemory();
-                return;
-            }
-
             try {
+                let newGalleryItems: StoredImage[] = [];
+
                 for (const src of imageSrcs) {
                     const uuid = crypto.randomUUID();
-                    const imageKey = `image-${uuid}.jpg`;
-                    const jsonKey = `prompt-${uuid}.json`;
+                    const imageFilename = `image-${uuid}.jpeg`;
+                    const jsonFilename = `prompt-${uuid}.json`;
                     const imageBlob = base64ToBlob(src, 'image/jpeg');
+                    
+                    // 1. Upload image
+                    const imageUploadResponse = await uploadFile(imageBlob, imageFilename);
+                    const publicUrl = imageUploadResponse.public_url;
+
+                    // 2. Prepare and upload JSON metadata
                     const jsonData = {
                         prompt: promptToUse,
                         settings: { photorealisticSettings },
                         timestamp: Date.now(),
+                        imageUrl: publicUrl,
                     };
-                    const jsonString = JSON.stringify(jsonData, null, 2);
-                    const jsonBlob = new Blob([jsonString], { type: 'application/json' });
-                    
-                    await uploadToS3({ key: imageKey, body: imageBlob, contentType: 'image/jpeg' });
-                    await uploadToS3({ key: jsonKey, body: jsonBlob, contentType: 'application/json' });
+                    await saveJson(jsonFilename, jsonData);
+
+                    // 3. Create the new item for our local gallery state
+                    const newStoredImage: StoredImage = {
+                        id: uuid,
+                        src: publicUrl,
+                        prompt: promptToUse,
+                        settings: { photorealisticSettings },
+                        timestamp: jsonData.timestamp,
+                    };
+                    newGalleryItems.push(newStoredImage);
                 }
-                await handleRefresh();
-            } catch (s3Error: any) {
-                console.error("Failed to upload to S3", s3Error);
-                setError(`Failed to upload to S3: ${getS3ErrorMessage(s3Error)}. Saving to in-memory gallery instead.`);
-                setS3Available(false);
-                saveToMemory();
+
+                // 4. Update localStorage
+                const currentItemsJSON = localStorage.getItem('galleryItems');
+                const currentItems: StoredImage[] = currentItemsJSON ? JSON.parse(currentItemsJSON) : [];
+                const updatedItems = [...newGalleryItems, ...currentItems];
+                localStorage.setItem('galleryItems', JSON.stringify(updatedItems));
+
+                // 5. Refresh UI
+                handleRefresh();
+
+            } catch (apiError: any) {
+                console.error("Failed to upload to API", apiError);
+                setError(`Upload Failed: ${getApiErrorMessage(apiError)}. The generated image was not saved.`);
             }
         };
         
@@ -660,7 +612,7 @@ const App = () => {
                     reader.readAsDataURL(blob);
                 }).catch(err => {
                     console.error("Failed to fetch image for reference:", err);
-                    setError(`Failed to load reference image from S3: ${getS3ErrorMessage(err)}`);
+                    setError(`Failed to load reference image from storage: ${getApiErrorMessage(err)}`);
                 });
         }
     };
@@ -676,7 +628,7 @@ const App = () => {
     };
     
     const handleUpscaleImage = async (image: StoredImage, aspectRatio: string) => {
-       alert("Upscaling is not compatible with S3 storage in this version.");
+       alert("Upscaling is not implemented in this version.");
     };
 
     const handleSaveGalleryPromptToCollection = (image: StoredImage, folderId: string) => {
@@ -693,7 +645,6 @@ const App = () => {
                 prompt: image.prompt,
                 timestamp: Date.now(),
             };
-            // FIX: This robustly updates the state, triggering all necessary downstream effects.
             setUserSavedPrompts(prevPrompts => [...prevPrompts, newSavedPrompt]);
             alert(`Prompt "${title.trim()}" saved to "My Saved Prompts"!`);
         }
@@ -757,25 +708,7 @@ const App = () => {
     }, [ai]);
 
     const handleSaveDecodedPrompt = async (decodedJson: DecodedPrompt, folderId: string) => {
-        if (!s3Available) {
-            setError("Cannot save decoded prompt. S3 is unavailable.");
-            return;
-        }
-        setError(null);
-        try {
-            const uuid = crypto.randomUUID();
-            const jsonKey = `decoded-prompt-${uuid}.json`;
-            const dataToSave = {
-                timestamp: Date.now(),
-                content: decodedJson
-            };
-            const jsonBlob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
-            await uploadToS3({ key: jsonKey, body: jsonBlob, contentType: 'application/json' });
-            await handleRefresh();
-        } catch (s3Error: any) {
-             console.error("Failed to save decoded prompt to S3", s3Error);
-             setError(`Failed to save to S3: ${getS3ErrorMessage(s3Error)}`);
-        }
+        alert("Saving decoded prompts to the backend is not supported in this version.");
     };
     
     const handlePhotorealisticSettingsChange = (newSettings: DecodedPrompt) => {
@@ -883,46 +816,6 @@ const App = () => {
         setTemplatePrompts(updatedPrompts);
         localStorage.setItem('user-template-prompts', JSON.stringify(updatedPrompts));
     };
-
-    const handleAddDummyData = async () => {
-        if (!s3Available) {
-            setError("Cannot add dummy data. S3 is unavailable.");
-            return;
-        }
-        setIsRefreshing(true);
-        setError(null);
-        try {
-            const dummyItems = [
-                { prompt: 'A majestic lion with a crown of stars', settings: { photorealisticSettings: { ...photorealisticSettings, action: 'staring majestically' } } },
-                { prompt: 'A futuristic cityscape at night with flying cars', settings: { photorealisticSettings: { ...photorealisticSettings, background: 'Modern City Street', backgroundElements: 'Neon-lit cyberpunk alleyway' } } },
-            ];
-            // A tiny 1x1 black pixel GIF
-            const placeholderImg = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-            const imageBlob = base64ToBlob(placeholderImg, 'image/gif');
-
-            for (const item of dummyItems) {
-                const uuid = crypto.randomUUID();
-                const imageKey = `image-${uuid}.jpg`;
-                const jsonKey = `prompt-${uuid}.json`;
-
-                const jsonData = {
-                    prompt: item.prompt,
-                    settings: item.settings,
-                    timestamp: Date.now(),
-                };
-                const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-                
-                await uploadToS3({ key: imageKey, body: imageBlob, contentType: 'image/jpeg' });
-                await uploadToS3({ key: jsonKey, body: jsonBlob, contentType: 'application/json' });
-            }
-            await handleRefresh();
-        } catch (e: any) {
-            console.error("Failed to add dummy data", e);
-            setError(`Failed to add dummy data to S3: ${getS3ErrorMessage(e)}`);
-        } finally {
-            setIsRefreshing(false);
-        }
-    };
     
     // --- Prompt History Handlers ---
     const handleSelectHistoryPrompt = (prompt: string) => {
@@ -936,39 +829,61 @@ const App = () => {
         }
     };
 
+    // --- Chat Optimizer Handler ---
+    const handleSendMessageToOptimizer = useCallback(async (message: string) => {
+        if (!optimizerChat || !message.trim()) return;
+
+        const userMessage = { role: 'user', text: message };
+        setChatHistory(prev => [...prev, userMessage]);
+        setIsOptimizing(true);
+
+        try {
+            const response = await optimizerChat.sendMessage({ message });
+            const modelMessage = { role: 'model', text: response.text };
+            setChatHistory(prev => [...prev, modelMessage]);
+        } catch (e) {
+            console.error("Optimizer chat failed", e);
+            const errorMessage = { role: 'model', text: "Sorry, I couldn't process that. Please try again." };
+            setChatHistory(prev => [...prev, errorMessage]);
+        } finally {
+            setIsOptimizing(false);
+        }
+    }, [optimizerChat]);
+
     // --- Props for children ---
-    // FIX: Define `isConfigured` based on whether the `ai` instance is available.
-    // This variable is used in child components to enable/disable AI features.
     const isConfigured = !!ai;
-    const creatorState = { userPrompt, studioPrompt, useStudioPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, s3Available, photorealisticSettings, isConfigured, promptHistory };
-    const creatorHandlers = { setUserPrompt, setUseStudioPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange, handleSelectHistoryPrompt, handleClearPromptHistory };
-    const aiToolsState = { isDecoding, decodedPromptJson, s3Available, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
+    const creatorState = { userPrompt, studioPrompt, useStudioPrompt, generatedImages, isGenerating, error, copySuccess, subjectReferenceImage, isGettingIdea, strictFaceLock, strictHairLock, photorealisticSettings, isConfigured, promptHistory, chatHistory, isOptimizing, optimizerSystemPrompt };
+    const creatorHandlers = { setUserPrompt, setUseStudioPrompt, handleGenerateImage, handleCopyPrompt, handleImageUpload, handleRemoveImage, handleGetIdeaFromImage, setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings: handlePhotorealisticSettingsChange, handleSelectHistoryPrompt, handleClearPromptHistory, handleSendMessageToOptimizer, setOptimizerSystemPrompt, handleSaveCreatorPrompt };
+    const aiToolsState = { isDecoding, decodedPromptJson, reverseEngineerImage, isReverseEngineering, reverseEngineeredPrompt };
     const aiToolsHandlers = { handleDecodePrompt, handleSaveDecodedPrompt, handleApplyDecodedPrompt, setReverseEngineerImage, setReverseEngineerImageMimeType, handleReverseEngineerPrompt, handleApplyReverseEngineeredPrompt, handleSaveReverseEngineeredPrompt };
 
     return (
-        <div className="h-screen bg-black flex flex-col p-4 gap-4 text-gray-200">
+        <div className="h-screen bg-theme-bg flex flex-col p-4 gap-4 text-theme-text">
             <SettingsModal 
                 isOpen={isSettingsModalOpen}
                 onClose={() => setIsSettingsModalOpen(false)}
                 onSave={handleSaveSettings}
                 initialApiKey={apiKey}
-                initialS3Config={s3Config}
+                initialApiConfig={apiConfig}
             />
-            <nav className="flex-shrink-0 bg-gray-900 p-2 flex items-center justify-center gap-2">
-                <button onClick={() => setActiveTab('creator')} className={`px-6 py-2 font-semibold transition ${activeTab === 'creator' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+            <nav className="flex-shrink-0 bg-theme-surface p-2 flex items-center justify-center gap-2 rounded-lg">
+                <button onClick={() => setActiveTab('creator')} className={`px-6 py-2 font-semibold transition rounded-md ${activeTab === 'creator' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}>
                     Creator
                 </button>
-                <button onClick={() => setActiveTab('gallery')} className={`px-6 py-2 font-semibold transition ${activeTab === 'gallery' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                <button onClick={() => setActiveTab('gallery')} className={`px-6 py-2 font-semibold transition rounded-md ${activeTab === 'gallery' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}>
                     Gallery ({savedImages.length})
                 </button>
-                <button onClick={() => setActiveTab('collection')} className={`px-6 py-2 font-semibold transition ${activeTab === 'collection' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                <button onClick={() => setActiveTab('collection')} className={`px-6 py-2 font-semibold transition rounded-md ${activeTab === 'collection' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}>
                     Collection ({collection.folders.reduce((acc, f) => acc + f.items.length, 0)})
                 </button>
-                 <button onClick={() => setActiveTab('ai_tools')} className={`px-6 py-2 font-semibold transition ${activeTab === 'ai_tools' ? 'bg-gray-300 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                 <button onClick={() => setActiveTab('ai_tools')} className={`px-6 py-2 font-semibold transition rounded-md ${activeTab === 'ai_tools' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}>
                     AI Tools
                 </button>
+                <button onClick={() => setActiveTab('ajax_uploader')} className={`px-6 py-2 font-semibold transition rounded-md ${activeTab === 'ajax_uploader' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}>
+                    AJAX Uploader
+                </button>
                 <div className="flex-grow"></div>
-                <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition" aria-label="Settings">
+                <button onClick={() => setIsSettingsModalOpen(true)} className="p-2 bg-transparent text-theme-text-secondary hover:bg-theme-surface-2 hover:text-white transition rounded-full" aria-label="Settings">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -977,7 +892,7 @@ const App = () => {
             </nav>
             <div className="flex-grow min-h-0">
                 {activeTab === 'creator' && (
-                    <Creator state={creatorState} handlers={creatorHandlers} collection={collection} onSavePrompt={handleSaveCreatorPrompt} />
+                    <Creator state={creatorState} handlers={creatorHandlers} collection={collection} />
                 )}
                 {activeTab === 'gallery' && (
                     <Gallery 
@@ -995,8 +910,6 @@ const App = () => {
                         collection={collection}
                         onRefresh={handleRefresh}
                         isRefreshing={isRefreshing}
-                        onAddDummyData={handleAddDummyData}
-                        s3Available={s3Available}
                         onOpenSettings={() => setIsSettingsModalOpen(true)}
                         onSaveTemplates={handleSaveTemplatePrompts}
                     />
@@ -1008,9 +921,12 @@ const App = () => {
                         collection={collection}
                     />
                 )}
+                {activeTab === 'ajax_uploader' && (
+                    <AjaxUploader />
+                )}
             </div>
              {error && (
-                <div className="absolute bottom-4 right-4 bg-red-800 text-white p-4 max-w-sm z-50 shadow-lg">
+                <div className="absolute bottom-4 right-4 bg-red-800 text-white p-4 max-w-sm z-50 shadow-lg rounded-lg">
                     <p className="font-bold">An Error Occurred</p>
                     <p className="text-sm whitespace-pre-wrap">{error}</p>
                     <button onClick={() => setError(null)} className="absolute top-1 right-2 text-lg">&times;</button>
