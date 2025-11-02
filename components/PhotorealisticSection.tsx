@@ -95,7 +95,7 @@ export const PhotorealisticSection = ({ settings, onSettingsChange, isReferenceI
     };
 
 
-    const baseInputClasses = "w-full p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary";
+    const baseInputClasses = "w-full px-2 py-1.5 text-sm bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary";
     const disabledInputClasses = "disabled:opacity-50 disabled:cursor-not-allowed";
 
     // Get the clothing detail options for the currently selected style.

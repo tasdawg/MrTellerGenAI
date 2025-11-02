@@ -48,7 +48,7 @@ export const SettingsModal = ({ isOpen, onClose, onSave, initialApiKey, initialA
         onSave({ apiKey, apiConfig });
     };
 
-    const baseInputClasses = "w-full p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary";
+    const baseInputClasses = "w-full px-2 py-1.5 text-sm bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary";
     
     const renderApiKeyTab = () => (
         <div className="space-y-4 pt-6">

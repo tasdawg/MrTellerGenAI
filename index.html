@@ -6,9 +6,15 @@
     <title>Smart Prompt Optimizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        html, body, #root {
-            height: 100vh; /* Use vh for full viewport height */
-            overflow: hidden; /* Prevent body scroll, allow components to manage their own scroll */
+        html, body {
+            min-height: 100vh; /* Allow body to grow */
+            margin: 0;
+            padding: 0;
+        }
+        #root {
+            min-height: 100vh;
+            display: flex; /* Ensure root can contain a flex layout properly */
+            flex-direction: column;
         }
         body {
             font-family: 'Inter', sans-serif;
@@ -19,7 +25,7 @@
             width: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #111827; /* theme-bg */
+            background: #1f2937; /* theme-surface */
         }
         ::-webkit-scrollbar-thumb {
             background: #374151; /* theme-surface-2 */

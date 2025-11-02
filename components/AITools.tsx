@@ -9,7 +9,6 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
 
     const [activeTool, setActiveTool] = useState('decoder'); // 'decoder' or 'reverse_engineer'
     const [promptToDecode, setPromptToDecode] = useState('');
-    const [showSaveOptions, setShowSaveOptions] = useState(false);
     const [showSaveView, setShowSaveView] = useState(false);
     const [saveName, setSaveName] = useState('');
     const [isPasting, setIsPasting] = useState(false);
@@ -99,9 +98,9 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
 
 
     const renderDecoder = () => (
-        <div className="flex flex-col md:flex-row gap-4 h-full">
-            {/* --- Left Panel: Decoder Input --- */}
-            <aside className="w-full md:w-1/2 lg:w-1/3 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg">
+        <div className="flex flex-col gap-4">
+            {/* --- Top Panel: Decoder Input --- */}
+            <section className="w-full bg-theme-surface p-6 shadow-lg flex flex-col gap-6 rounded-lg">
                 <h2 className="text-xl font-bold text-white">Prompt Decoder</h2>
                 <p className="text-sm text-theme-text-secondary">
                     Paste a complex prompt below. The AI will analyze it and break it down into the categories used by the Photorealistic Studio.
@@ -112,7 +111,7 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                         value={promptToDecode}
                         onChange={(e) => setPromptToDecode(e.target.value)}
                         placeholder="e.g., A photorealistic image of a woman in a red, flowing Hanfu dress..."
-                        className={`${baseInputClasses} h-48`}
+                        className={`${baseInputClasses} h-24`}
                     />
                 )}
                 
@@ -124,12 +123,12 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                     {isDecoding ? <div className="spinner !w-5 !h-5 !border-white"></div> : '🧩'}
                     Decode Prompt
                 </button>
-            </aside>
+            </section>
 
-            {/* --- Right Panel: Decoder Output --- */}
-            <main className="w-full md:w-1/2 lg:w-2/3 bg-theme-surface p-6 flex flex-col gap-6 overflow-y-auto rounded-lg">
+            {/* --- Bottom Panel: Decoder Output --- */}
+            <section className="w-full bg-theme-surface p-6 flex flex-col gap-6 rounded-lg">
                 <h2 className="text-xl font-bold">Decoded Output</h2>
-                <div className="flex-grow bg-theme-bg/50 p-4 flex items-center justify-center min-h-0 relative rounded-lg">
+                <div className="bg-theme-bg/50 p-4 flex items-center justify-center min-h-[200px] relative rounded-lg">
                     {isDecoding && <Loader message="Analyzing prompt..." />}
                     {!isDecoding && !decodedPromptJson && (
                         <div className="text-center text-theme-text-secondary">
@@ -137,7 +136,7 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                         </div>
                     )}
                     {!isDecoding && decodedPromptJson && (
-                        <div className="w-full h-full overflow-y-auto">
+                        <div className="w-full h-full max-h-64 overflow-y-auto">
                             <pre className="text-xs text-theme-text whitespace-pre-wrap break-all">
                                 {JSON.stringify(decodedPromptJson, null, 2)}
                             </pre>
@@ -147,7 +146,7 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                 <div className="relative flex items-center gap-4">
                     <button
                         disabled={true}
-                        className={secondaryButtonClasses}
+                        className={`${secondaryButtonClasses} opacity-50 cursor-not-allowed`}
                         title="Saving decoded prompts is not supported in this version."
                     >
                         💾 Save to Collection
@@ -160,88 +159,96 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                         ⚙️ Use in Creator
                     </button>
                 </div>
-            </main>
+            </section>
         </div>
     );
 
     const renderReverseEngineer = () => (
-         <div className="flex flex-col md:flex-row gap-4 h-full">
-            {/* --- Left Panel: Image Input --- */}
-            <aside className="w-full md:w-1/2 lg:w-1/3 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg">
+         <div className="flex flex-col gap-4">
+            <section className="w-full bg-theme-surface p-6 shadow-lg flex flex-col gap-6 rounded-lg">
                 <h2 className="text-xl font-bold text-white">Prompt Reverse Engineer</h2>
                 <p className="text-sm text-theme-text-secondary">
-                    Upload an image and the AI will generate a highly detailed, creative prompt inspired by it, based on a template of professional prompts.
+                    Upload or paste an image and the AI will generate a detailed, descriptive prompt based on its content.
                 </p>
 
-                 <div className="space-y-3">
-                    <label className="text-sm font-medium text-theme-text-secondary">Reference Image</label>
-                    {reverseEngineerImage ? (
-                        <div className="relative group">
-                            <img src={reverseEngineerImage} alt="Reference for reverse engineering" className="w-full rounded-md" />
-                            <button onClick={handleRemoveImage} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 hover:bg-black/80 transition-opacity opacity-0 group-hover:opacity-100 rounded-full" aria-label="Remove image">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <div className="flex-grow w-full">
+                        {renderFormControl("Image for Analysis",
+                             <div className="w-full aspect-video bg-theme-surface-2 rounded-md flex items-center justify-center relative">
+                                {reverseEngineerImage ? (
+                                    <>
+                                        <img src={reverseEngineerImage} alt="Preview" className="max-w-full max-h-full object-contain rounded-md"/>
+                                        <button onClick={handleRemoveImage} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 hover:bg-black/80 transition rounded-full" aria-label="Remove image">
+                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <p className="text-xs text-theme-text-secondary">Upload or paste an image</p>
+                                )}
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                             <input type="file" id="reverse-image-upload" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                             <label htmlFor="reverse-image-upload" className={`${secondaryButtonClasses} text-sm flex-grow text-center`}>
+                                🖼️ Upload
+                            </label>
+                            <button onClick={handlePasteImage} disabled={isPasting} className={`${secondaryButtonClasses} text-sm flex-grow`}>
+                                {isPasting ? 'Pasting...' : '📋 Paste'}
                             </button>
                         </div>
-                    ) : (
-                        <>
-                            <input type="file" id="reverse-engineer-upload" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handleImageUpload} />
-                            <div className="grid grid-cols-2 gap-2">
-                                <label htmlFor="reverse-engineer-upload" className="w-full text-center cursor-pointer bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 flex items-center justify-center rounded-md">
-                                    🖼️ Upload
-                                </label>
-                                <button onClick={handlePasteImage} disabled={isPasting} className="w-full text-center cursor-pointer bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 flex items-center justify-center disabled:opacity-50 rounded-md">
-                                    {isPasting ? 'Pasting...' : '📋 Paste'}
-                                </button>
-                            </div>
-                        </>
-                    )}
+                    </div>
+                    <div className="flex-grow w-full">
+                         <button
+                            onClick={handleReverseEngineerPrompt}
+                            disabled={isReverseEngineering || !reverseEngineerImage}
+                            className={`${primaryButtonClasses} w-full flex items-center justify-center gap-2`}
+                        >
+                            {isReverseEngineering ? <div className="spinner !w-5 !h-5 !border-white"></div> : '🛠️'}
+                            Generate Prompt
+                        </button>
+                    </div>
                 </div>
-                
-                <button
-                    onClick={handleReverseEngineerPrompt}
-                    disabled={isReverseEngineering || !reverseEngineerImage}
-                    className={`${primaryButtonClasses} w-full flex items-center justify-center gap-2`}
-                >
-                    {isReverseEngineering ? <div className="spinner !w-5 !h-5 !border-white"></div> : '🛠️'}
-                    Reverse Engineer Prompt
-                </button>
-            </aside>
 
-            {/* --- Right Panel: Generated Prompt Output --- */}
-            <main className="w-full md:w-1/2 lg:w-2/3 bg-theme-surface p-6 flex flex-col gap-6 overflow-y-auto rounded-lg">
-                <h2 className="text-xl font-bold">Generated Prompt</h2>
-                <div className="flex-grow bg-theme-bg/50 p-4 flex items-center justify-center min-h-0 relative rounded-lg">
-                    {isReverseEngineering && !reverseEngineeredPrompt && <Loader message="Generating prompt from image..." />}
-                    
+            </section>
+            
+            <section className="w-full bg-theme-surface p-6 flex flex-col gap-6 rounded-lg">
+                <h2 className="text-xl font-bold">Generated Prompt Output</h2>
+                <div className="bg-theme-bg/50 p-2 flex items-center justify-center min-h-[200px] relative rounded-lg">
+                    {isReverseEngineering && <Loader message="Analyzing image and generating prompt..." />}
                     {!isReverseEngineering && !reverseEngineeredPrompt && (
                         <div className="text-center text-theme-text-secondary">
                             The generated prompt will appear here.
                         </div>
                     )}
-                    
-                    {reverseEngineeredPrompt && (
-                        <textarea
+                    {!isReverseEngineering && reverseEngineeredPrompt && (
+                         <textarea
                             readOnly
                             value={reverseEngineeredPrompt}
-                            className="w-full h-full p-3 bg-theme-surface border border-theme-border rounded-md resize-none font-mono text-xs"
+                            className={`${baseInputClasses} h-48 resize-y font-mono text-xs`}
                         />
                     )}
                 </div>
-                <div className="flex-shrink-0">
-                    <div className="relative flex items-center gap-4">
-                         <button
-                            onClick={() => navigator.clipboard.writeText(reverseEngineeredPrompt)}
-                            disabled={!reverseEngineeredPrompt}
-                            className={secondaryButtonClasses}
-                        >
-                            📋 Copy Prompt
-                        </button>
+                
+                {showSaveView ? (
+                    <div className="flex items-center gap-2 bg-theme-surface-2 p-2 rounded-md">
+                        <input
+                            type="text"
+                            value={saveName}
+                            onChange={(e) => setSaveName(e.target.value)}
+                            placeholder="Enter a title for your prompt..."
+                            className={`${baseInputClasses} flex-grow`}
+                        />
+                         <button onClick={handleConfirmSaveReversePrompt} disabled={!saveName.trim()} className={primaryButtonClasses}>Confirm</button>
+                         <button onClick={() => setShowSaveView(false)} className={secondaryButtonClasses}>Cancel</button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-4">
                         <button
-                            onClick={() => { setShowSaveView(true); setSaveName(''); }}
+                            onClick={() => setShowSaveView(true)}
                             disabled={!reverseEngineeredPrompt}
                             className={secondaryButtonClasses}
                         >
-                            💾 Save Prompt
+                            💾 Save to Collection
                         </button>
                         <button
                             onClick={handleApplyReverseEngineeredPrompt}
@@ -251,40 +258,27 @@ export const AITools = ({ state, handlers, collection }: { state: any, handlers:
                             ⚙️ Use in Creator
                         </button>
                     </div>
-                    {showSaveView && (
-                        <div className="mt-4 p-4 bg-theme-bg/50 space-y-3 rounded-lg">
-                             <p className="text-sm font-semibold">Save to "Reverse Engineered Prompts"</p>
-                             <div className="flex items-center gap-2">
-                                <input 
-                                    type="text" 
-                                    value={saveName} 
-                                    onChange={(e) => setSaveName(e.target.value)} 
-                                    placeholder="Enter a name for this prompt"
-                                    className={`${baseInputClasses} flex-grow`}
-                                    aria-label="Prompt name"
-                                />
-                                <button onClick={handleConfirmSaveReversePrompt} className={primaryButtonClasses}>Save</button>
-                                <button onClick={() => setShowSaveView(false)} className={`${secondaryButtonClasses} bg-theme-border`}>Cancel</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
+                )}
+            </section>
         </div>
     );
-
+    
     return (
-        <div className="flex flex-col h-full bg-theme-bg/50 p-6 rounded-lg">
-            <div className="flex-shrink-0 border-b border-theme-border mb-4">
-                <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                    <button onClick={() => setActiveTool('decoder')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${activeTool === 'decoder' ? 'border-theme-primary text-theme-text' : 'border-transparent text-theme-text-secondary hover:text-theme-text hover:border-theme-accent'}`}>
-                        Prompt Decoder
-                    </button>
-                    <button onClick={() => setActiveTool('reverse_engineer')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${activeTool === 'reverse_engineer' ? 'border-theme-primary text-theme-text' : 'border-transparent text-theme-text-secondary hover:text-theme-text hover:border-theme-accent'}`}>
-                        Prompt Reverse Engineer
-                    </button>
-                </nav>
-            </div>
+        <div className="flex flex-col gap-4 h-full">
+            <nav className="flex-shrink-0 bg-theme-surface p-2 flex items-center justify-center flex-wrap gap-2 rounded-lg">
+                <button
+                    onClick={() => setActiveTool('decoder')}
+                    className={`px-6 py-2 font-semibold transition rounded-md ${activeTool === 'decoder' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}
+                >
+                    Prompt Decoder
+                </button>
+                <button
+                    onClick={() => setActiveTool('reverse_engineer')}
+                    className={`px-6 py-2 font-semibold transition rounded-md ${activeTool === 'reverse_engineer' ? 'bg-theme-primary text-white' : 'bg-transparent text-theme-text-secondary hover:bg-theme-surface-2'}`}
+                >
+                    Reverse Engineer
+                </button>
+            </nav>
             <div className="flex-grow min-h-0">
                 {activeTool === 'decoder' ? renderDecoder() : renderReverseEngineer()}
             </div>

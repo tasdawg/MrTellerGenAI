@@ -61,12 +61,13 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
             
     return (
         <React.Fragment>
-            <div className="flex flex-col md:flex-row gap-4 h-full">
-                <aside className="w-full md:w-1/3 lg:w-1/4 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg max-h-[50vh] md:max-h-full">
+            <div className="flex flex-col gap-6">
+                {/* --- Top Section: Settings & Controls --- */}
+                <section className="w-full bg-theme-surface p-6 shadow-lg flex flex-col gap-6 rounded-lg">
                     <h1 className="text-2xl font-bold text-white">Asian Photorealism Studio</h1>
                     
                     <div className="space-y-6 pt-4 border-t border-theme-border">
-                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 gap-4">
+                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <ReferenceImageThumbnail 
                                 imageSrc={faceReferenceImage}
                                 onRemove={handleRemoveFaceImage}
@@ -102,7 +103,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                         </div>
                     </div>
                     
-                    <CollapsibleSection title="Studio Settings" defaultOpen={true}>
+                    <CollapsibleSection title="Studio Settings" defaultOpen={false}>
                         <PhotorealisticSection
                             settings={photorealisticSettings}
                             onSettingsChange={setPhotorealisticSettings}
@@ -110,13 +111,13 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                         />
                     </CollapsibleSection>
 
-                </aside>
+                </section>
                 
-                <main className="w-full md:w-2/3 lg:w-3/4 bg-theme-bg p-2 sm:p-6 flex flex-col lg:flex-row gap-6 overflow-hidden rounded-lg">
-                    {/* --- Left Column: Prompts & Controls --- */}
-                     <div className="w-full lg:w-1/2 flex flex-col gap-4 overflow-hidden">
-                        {/* --- Top Part: Scrollable Prompts & Controls --- */}
-                        <div className="flex-shrink-0 overflow-y-auto pr-2 space-y-6">
+                {/* --- Middle Section: Prompts & Chat --- */}
+                <section className="w-full flex flex-col gap-6">
+                    {/* --- Prompts & Controls --- */}
+                     <div className="w-full flex flex-col gap-4">
+                        <div className="space-y-6">
                             {/* --- CUSTOM PROMPT SECTION --- */}
                             <div>
                                 <h2 className="text-xl font-bold">Custom Prompt</h2>
@@ -133,7 +134,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                                             }
                                         }}
                                         placeholder="Enter a custom prompt or apply one from AI Tools..."
-                                        className={`w-full h-24 p-3 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition resize-y font-mono text-sm ${useStudioPrompt ? 'opacity-50' : ''}`}
+                                        className={`w-full h-24 p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition resize-y font-mono text-sm ${useStudioPrompt ? 'opacity-50' : ''}`}
                                     />
                                 </div>
                                 <div className="mt-2">
@@ -176,7 +177,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                                         readOnly
                                         value={studioPrompt}
                                         placeholder="Your generated prompt will appear here..."
-                                        className={`w-full h-24 p-3 bg-theme-surface border border-theme-border rounded-md transition resize-none font-mono text-sm ${!useStudioPrompt ? 'opacity-50' : ''}`}
+                                        className={`w-full h-24 p-2 bg-theme-surface border border-theme-border rounded-md transition resize-none font-mono text-sm ${!useStudioPrompt ? 'opacity-50' : ''}`}
                                     />
                                 </div>
                                 <div className="mt-4 p-3 bg-theme-surface/50 rounded-md">
@@ -204,8 +205,8 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                                 </div>
                             </div>
                         </div>
-                        {/* --- Bottom Part: Chat Optimizer --- */}
-                        <div className="flex-grow flex flex-col min-h-0 border-t-2 border-theme-border mt-4 pt-4">
+                        {/* --- Chat Optimizer --- */}
+                        <div className="border-t-2 border-theme-border mt-4 pt-4">
                             <ChatOptimizer
                                 history={chatHistory}
                                 isOptimizing={isOptimizing}
@@ -216,29 +217,28 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                             />
                         </div>
                      </div>
+                </section>
 
-
-                    {/* --- Right Column: Image Display --- */}
-                     <div className="w-full lg:w-1/2 bg-theme-bg/50 p-4 flex items-center justify-center min-h-[300px] lg:min-h-0 rounded-lg">
-                        {error && <div className="text-center text-red-400 border border-red-500 p-4 rounded-lg"><p className="font-bold">An Error Occurred</p><p>{error}</p></div>}
-                        {!error && isGenerating && <Loader message="Generating & saving..."/>}
-                        {!error && !isGenerating && generatedImages.length === 0 && <div className="text-center text-theme-text-secondary">{ isConfigured ? 'Your generated images will appear here.' : 'Please set your API Key in Settings to generate images.'}</div>}
-                        {!error && !isGenerating && generatedImages.length > 0 && (
-                            <div className={`grid gap-4 ${generatedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} w-full max-w-4xl`}>
-                                {generatedImages.map((src, index) => (
-                                    <div key={index} className="relative group">
-                                        <img 
-                                            src={src} 
-                                            alt={`Generated variation ${index + 1}`} 
-                                            className="object-contain w-full h-auto shadow-lg max-h-[60vh] cursor-pointer hover:opacity-90 transition-opacity rounded-lg"
-                                            onClick={() => setEnlargedImageSrc(src)}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                     </div>
-                </main>
+                {/* --- Bottom Section: Image Display --- */}
+                 <section className="w-full bg-theme-bg/50 p-4 flex items-center justify-center min-h-[300px] rounded-lg">
+                    {error && <div className="text-center text-red-400 border border-red-500 p-4 rounded-lg"><p className="font-bold">An Error Occurred</p><p>{error}</p></div>}
+                    {!error && isGenerating && <Loader message="Generating & saving..."/>}
+                    {!error && !isGenerating && generatedImages.length === 0 && <div className="text-center text-theme-text-secondary">{ isConfigured ? 'Your generated images will appear here.' : 'Please set your API Key in Settings to generate images.'}</div>}
+                    {!error && !isGenerating && generatedImages.length > 0 && (
+                        <div className={`grid gap-4 ${generatedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} w-full max-w-4xl`}>
+                            {generatedImages.map((src, index) => (
+                                <div key={index} className="relative group">
+                                    <img 
+                                        src={src} 
+                                        alt={`Generated variation ${index + 1}`} 
+                                        className="object-contain w-full h-auto shadow-lg max-h-[60vh] cursor-pointer hover:opacity-90 transition-opacity rounded-lg"
+                                        onClick={() => setEnlargedImageSrc(src)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                 </section>
             </div>
             
             {enlargedImageSrc && (

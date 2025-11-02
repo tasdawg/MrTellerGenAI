@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState } from 'react';
 import { Collection as CollectionType, CollectionItem, StoredImage, TemplatePrompt, UserSavedPrompt } from '../utils/db';
 import { Loader } from './Loader';
@@ -391,8 +387,8 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onOpenSettings
     };
 
     return (
-        <div className="flex flex-col md:flex-row gap-4 h-full bg-theme-bg/50 p-6 rounded-lg">
-            <aside className="w-full md:w-1/3 lg:w-1/4 bg-theme-surface p-4 flex flex-col gap-4 rounded-lg flex-shrink-0">
+        <div className="flex flex-col gap-4 h-full bg-theme-bg/50 p-6 rounded-lg">
+            <section className="w-full bg-theme-surface p-4 flex flex-col gap-4 rounded-lg">
                 <h2 className="text-xl font-bold text-white">My Collections</h2>
                  <button onClick={onOpenSettings} className="w-full p-2 bg-theme-surface-2 hover:bg-theme-border text-white font-bold transition rounded-md">
                     ⚙️ Settings
@@ -401,7 +397,7 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onOpenSettings
                     {isRefreshing ? <div className="spinner !w-5 !h-5 !border-white"></div> : '🔄'}
                     Refresh Gallery
                 </button>
-                <div className="flex-grow overflow-y-auto space-y-2">
+                <div className="space-y-2">
                     {collection.folders.map((folder) => (
                         <button
                             key={folder.id}
@@ -412,7 +408,7 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onOpenSettings
                         </button>
                     ))}
                 </div>
-                <div className="flex-shrink-0 space-y-2 border-t border-theme-border pt-4">
+                <div className="space-y-2 border-t border-theme-border pt-4">
                      <button disabled className="w-full p-2 bg-theme-surface-2 font-bold transition opacity-50 cursor-not-allowed rounded-md">
                         + New Folder (N/A)
                     </button>
@@ -421,7 +417,7 @@ export const Collection = ({ collection, onRefresh, isRefreshing, onOpenSettings
                         <button disabled className="w-full p-2 bg-theme-surface-2 font-bold transition opacity-50 cursor-not-allowed rounded-md">Import</button>
                     </div>
                 </div>
-            </aside>
+            </section>
             <main className="flex-grow bg-theme-surface p-4 flex flex-col gap-4 relative rounded-lg">
                  {isRefreshing && !editingItem && !selectedItem && (
                     <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10 rounded-lg">
