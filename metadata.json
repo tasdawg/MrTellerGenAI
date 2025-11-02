@@ -1,5 +1,5 @@
 {
-  "name": "Copy of image gen",
+  "name": "GenAI Image",
   "description": "An empty app",
   "requestFramePermissions": [
     "clipboard-read"

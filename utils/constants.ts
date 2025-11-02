@@ -6,7 +6,36 @@ export const ASPECT_RATIOS = ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"];
 export const GENDERS = ['Female', 'Male'];
 export const ETHNICITIES = ['East Asian', 'Southeast Asian', 'South Asian', 'Caucasian', 'African', 'Hispanic', 'Middle Eastern'];
 
+export const ARTISTIC_STYLES = [
+    'None',
+    // --- Realistic Styles ---
+    'Photorealistic',
+    'Hyperrealistic',
+    'Cinematic',
+    '8K Ultra-HD',
+    'Editorial Photography',
+    // --- Creative Styles ---
+    'Pixar Animation',
+    '90s Anime',
+    'Oil Painting',
+    'Watercolor Painting',
+    'Charcoal Sketch',
+    'Tattoo Art',
+    'Graffiti / Street Art',
+    'Steampunk',
+    'Cyberpunk',
+    'Fantasy Concept Art',
+    'Ukiyo-e (Japanese Woodblock)',
+    'Art Deco',
+    'Pop Art',
+    'Surrealism',
+    'Abstract Expressionism',
+    'Impressionism',
+    'Concept Art'
+];
+
 export const CAMERA_MODELS = [
+    "None",
     "Canon EOS R5",
     "Sony Alpha a7R IV",
     "Nikon Z7 II",
@@ -25,6 +54,7 @@ export const CAMERA_MODELS = [
 ];
 
 export const LENS_TYPES = [
+    "None",
     "50mm f/1.8 (Standard Prime)",
     "85mm f/1.4 (Portrait Prime)",
     "35mm f/1.4 (Wide Prime)",
@@ -45,6 +75,7 @@ export const LENS_TYPES = [
 ];
 
 export const DRESS_STYLES = [
+    'None',
     'Ancient Chinese Dress', 
     'Vietnamese Ao Dai', 
     'Hanfu', 
@@ -81,6 +112,7 @@ export const CLOTHING_DETAILS_MAP = {
 };
 
 export const HAIR_STYLES = [
+    'None',
     'Long, silky, perfectly straight hair cascading down her back',
     'Voluminous, glossy waves framing her face and shoulders',
     'A graceful half-up, half-down style with soft tendrils',
@@ -113,6 +145,7 @@ export const HAIR_ACCESSORIES = [
 ];
 
 export const SKIN_DETAILS = [
+    'None',
     'Glowing porcelain skin with a few faint, natural freckles across the nose',
     'Soft, dewy skin with visible, realistic pores and a subtle beauty mark above the lip',
     'Perfectly smooth, matte skin with delicate, almost invisible vellus hair on the cheeks',
@@ -127,6 +160,7 @@ export const SKIN_DETAILS = [
 ];
 
 export const FASHION_AESTHETICS = [
+    'None',
     'Meticulously detailed fashion aesthetics',
     'Dark Academia, with tweed, vintage elements, and a scholarly feel',
     'Cottagecore, focusing on rustic, romantic, and pastoral styles',
@@ -143,6 +177,7 @@ export const FASHION_AESTHETICS = [
 ];
 
 export const BACKGROUND_SETTINGS = [
+    'None',
     'City Wall', 
     'Ancient Temple', 
     'Bamboo Forest', 
@@ -161,6 +196,7 @@ export const BACKGROUND_SETTINGS = [
     'Dusty Wild West Saloon'
 ];
 export const GAZE_OPTIONS = [
+    'None',
     'Looking at camera', 
     'Looking away', 
     'Eyes closed',
@@ -176,6 +212,7 @@ export const GAZE_OPTIONS = [
     'Eyes half-closed in pleasure'
 ];
 export const LIGHTING_PRESETS = [
+    'None',
     'Very soft and realistic', 
     'Dramatic Rembrandt lighting', 
     'Backlit silhouette with rim lighting', 
@@ -197,6 +234,7 @@ export const LIGHTING_PRESETS = [
 ];
 
 export const SHADOW_INTENSITY_OPTIONS = [
+    "None",
     "soft and subtle shadows",
     "natural, balanced shadows",
     "deep, dramatic shadows",
@@ -205,6 +243,7 @@ export const SHADOW_INTENSITY_OPTIONS = [
 ];
 
 export const HIGHLIGHT_BLOOM_OPTIONS = [
+    "None",
     "crisp, sharp highlights with no bloom",
     "gentle, soft highlight bloom",
     "dreamy, ethereal highlight glow",
@@ -213,6 +252,7 @@ export const HIGHLIGHT_BLOOM_OPTIONS = [
 ];
 
 export const BACKGROUND_ELEMENTS_PRESETS = [
+    'None',
     'Soldiers and swirling black smoke', 
     'Floating lanterns in a night sky', 
     'Intricate palace architecture', 

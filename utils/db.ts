@@ -1,12 +1,16 @@
 export interface StoredImage {
     id: string;
-    src: string;
+    src: string; // For local: base64 data URI. For cloud: full image public URL.
+    publicUrl?: string; // Optional field for the remote URL after a successful background upload
+    thumbnailUrl?: string; // URL for the thumbnail for cloud items
     prompt: string;
     settings: any;
     timestamp: number;
+    isReference?: boolean;
 }
 
 export interface DecodedPrompt {
+    artisticStyle: string;
     gender: string;
     ethnicity: string;
     dressStyle: string;

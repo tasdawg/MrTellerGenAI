@@ -6,28 +6,55 @@ import { PhotorealisticSection } from './PhotorealisticSection';
 import { Collection } from '../utils/db';
 import { ChatOptimizer } from './ChatOptimizer';
 
+const ReferenceImageThumbnail = ({ imageSrc, onRemove, onUpload, uploadId, title, onCrop }) => (
+    <div className="space-y-2">
+        <label className="text-sm font-medium text-theme-text-secondary">{title}</label>
+        {imageSrc ? (
+            <div className="relative group w-full aspect-square bg-theme-bg/50 rounded-md">
+                <img src={imageSrc} alt={title} className="w-full h-full object-cover rounded-md" />
+                <button onClick={onRemove} className="absolute top-1 right-1 bg-black/50 text-white p-1.5 hover:bg-black/80 transition-opacity opacity-0 group-hover:opacity-100 rounded-full" aria-label={`Remove ${title}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <button onClick={onCrop} className="absolute bottom-1 right-1 bg-black/50 text-white p-1.5 hover:bg-black/80 transition-opacity opacity-0 group-hover:opacity-100 rounded-full" aria-label={`Crop ${title}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"></path><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"></path></svg>
+                </button>
+            </div>
+        ) : (
+            <>
+                <input type="file" id={uploadId} className="hidden" accept="image/png, image/jpeg, image/webp" onChange={onUpload} />
+                <label htmlFor={uploadId} className="w-full aspect-square text-center cursor-pointer bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 flex items-center justify-center rounded-md text-xs">
+                    🖼️ Upload
+                </label>
+            </>
+        )}
+    </div>
+);
+
 export const Creator = ({ state, handlers, collection }: { state: any, handlers: any, collection: Collection }) => {
     const {
         userPrompt, studioPrompt, useStudioPrompt,
         generatedImages, isGenerating,
-        error, copySuccess, subjectReferenceImage, isGettingIdea,
-        strictFaceLock, strictHairLock, photorealisticSettings, isConfigured, promptHistory,
+        error, copySuccess, faceReferenceImage, clothingReferenceImage, sceneReferenceImage, backgroundReferenceImage,
+        photorealisticSettings, isConfigured, promptHistory,
         chatHistory, isOptimizing, optimizerSystemPrompt
     } = state;
     const {
         setUserPrompt, setUseStudioPrompt,
         handleGenerateImage, handleCopyPrompt,
-        handleImageUpload, handleRemoveImage, handleGetIdeaFromImage,
-        setStrictFaceLock, setStrictHairLock, setPhotorealisticSettings,
+        handleFaceImageUpload, handleRemoveFaceImage, handleClothingImageUpload, handleRemoveClothingImage,
+        handleSceneImageUpload, handleRemoveSceneImage, handleBackgroundImageUpload, handleRemoveBackgroundImage,
+        setPhotorealisticSettings,
         handleSelectHistoryPrompt, handleClearPromptHistory,
-        handleSendMessageToOptimizer, setOptimizerSystemPrompt, handleSaveCreatorPrompt
+        handleSendMessageToOptimizer, setOptimizerSystemPrompt, handleSaveCreatorPrompt,
+        onCropFaceReference, onCropClothingReference, onCropSceneReference, onCropBackgroundReference
     } = handlers;
     
     const [enlargedImageSrc, setEnlargedImageSrc] = React.useState<string | null>(null);
     
+    const hasAnyReference = faceReferenceImage || clothingReferenceImage || sceneReferenceImage || backgroundReferenceImage;
     let generateButtonText = '🖼 Generate Image';
-    if (subjectReferenceImage) {
-        generateButtonText = '🎨 Generate with Reference';
+    if (hasAnyReference) {
+        generateButtonText = '🎨 Generate with References';
     }
 
     const activePrompt = useStudioPrompt ? studioPrompt : userPrompt;
@@ -35,43 +62,43 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
     return (
         <React.Fragment>
             <div className="flex flex-col md:flex-row gap-4 h-full">
-                <aside className="w-full md:w-1/3 lg:w-1/4 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg">
+                <aside className="w-full md:w-1/3 lg:w-1/4 bg-theme-surface p-6 shadow-lg flex flex-col gap-6 overflow-y-auto rounded-lg max-h-[50vh] md:max-h-full">
                     <h1 className="text-2xl font-bold text-white">Asian Photorealism Studio</h1>
                     
                     <div className="space-y-6 pt-4 border-t border-theme-border">
-                        <div className="space-y-3">
-                            <label className="text-sm font-medium text-theme-text-secondary">Subject Reference</label>
-                            {subjectReferenceImage ? (
-                                <div className="relative group">
-                                    <img src={subjectReferenceImage} alt="Subject Reference" className="w-full rounded-md" />
-                                    <button onClick={() => handleRemoveImage()} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 hover:bg-black/80 transition-opacity opacity-0 group-hover:opacity-100 rounded-full" aria-label="Remove subject image">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                </div>
-                            ) : (
-                                <><input type="file" id="subject-image-upload" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handleImageUpload} /><label htmlFor="subject-image-upload" className="w-full text-center cursor-pointer bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 block rounded-md">🖼️ Upload Subject</label></>
-                            )}
-                             <button onClick={handleGetIdeaFromImage} disabled={!isConfigured || !subjectReferenceImage || isGettingIdea} className="w-full bg-theme-surface-2 hover:bg-theme-border text-white font-bold py-2 px-4 transition duration-300 disabled:bg-opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-md">
-                                {isGettingIdea ? <div className="spinner !w-5 !h-5"></div> : '💡'} Get Idea & Send to Tools
-                            </button>
-                            {subjectReferenceImage && (
-                                <div className="mt-4 p-3 bg-theme-bg/50 rounded-md space-y-3">
-                                    <p className="text-xs text-theme-text-secondary font-medium">Reference Fidelity</p>
-                                    <ToggleSwitch 
-                                        id="face-lock"
-                                        checked={strictFaceLock}
-                                        onChange={(e) => setStrictFaceLock(e.target.checked)}
-                                        label="Strict Face Lock"
-                                    />
-                                    <ToggleSwitch 
-                                        id="hair-lock"
-                                        checked={strictHairLock}
-                                        onChange={(e) => setStrictHairLock(e.target.checked)}
-                                        label="Strict Hair Lock"
-                                    />
-                                    <p className="text-xs text-theme-text-secondary/70">Ensure the generated image's face and hair closely match the reference.</p>
-                                </div>
-                            )}
+                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 gap-4">
+                            <ReferenceImageThumbnail 
+                                imageSrc={faceReferenceImage}
+                                onRemove={handleRemoveFaceImage}
+                                onUpload={handleFaceImageUpload}
+                                onCrop={onCropFaceReference}
+                                uploadId="face-image-upload"
+                                title="Face Reference"
+                            />
+                            <ReferenceImageThumbnail 
+                                imageSrc={clothingReferenceImage}
+                                onRemove={handleRemoveClothingImage}
+                                onUpload={handleClothingImageUpload}
+                                onCrop={onCropClothingReference}
+                                uploadId="clothing-image-upload"
+                                title="Clothing Reference"
+                            />
+                            <ReferenceImageThumbnail 
+                                imageSrc={sceneReferenceImage}
+                                onRemove={handleRemoveSceneImage}
+                                onUpload={handleSceneImageUpload}
+                                onCrop={onCropSceneReference}
+                                uploadId="scene-image-upload"
+                                title="Scene/Style Reference"
+                            />
+                            <ReferenceImageThumbnail 
+                                imageSrc={backgroundReferenceImage}
+                                onRemove={handleRemoveBackgroundImage}
+                                onUpload={handleBackgroundImageUpload}
+                                onCrop={onCropBackgroundReference}
+                                uploadId="background-image-upload"
+                                title="Background Reference"
+                            />
                         </div>
                     </div>
                     
@@ -79,14 +106,15 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                         <PhotorealisticSection
                             settings={photorealisticSettings}
                             onSettingsChange={setPhotorealisticSettings}
+                            isReferenceImageUsed={!!faceReferenceImage}
                         />
                     </CollapsibleSection>
 
                 </aside>
                 
-                <main className="w-full md:w-2/3 lg:w-3/4 bg-theme-bg p-6 flex flex-row gap-6 overflow-hidden rounded-lg">
+                <main className="w-full md:w-2/3 lg:w-3/4 bg-theme-bg p-2 sm:p-6 flex flex-col lg:flex-row gap-6 overflow-hidden rounded-lg">
                     {/* --- Left Column: Prompts & Controls --- */}
-                     <div className="w-1/2 flex flex-col gap-4 overflow-hidden">
+                     <div className="w-full lg:w-1/2 flex flex-col gap-4 overflow-hidden">
                         {/* --- Top Part: Scrollable Prompts & Controls --- */}
                         <div className="flex-shrink-0 overflow-y-auto pr-2 space-y-6">
                             {/* --- CUSTOM PROMPT SECTION --- */}
@@ -163,7 +191,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
 
                             {/* --- ACTION BUTTONS --- */}
                             <div>
-                                <div className="flex items-center gap-4 mt-3">
+                                <div className="flex items-center flex-wrap gap-4 mt-3">
                                     <button onClick={handleGenerateImage} disabled={!isConfigured || isGenerating || !activePrompt} className="px-6 py-2 bg-theme-primary text-white font-bold hover:bg-theme-primary-hover disabled:bg-theme-surface-2 disabled:text-theme-text-secondary disabled:cursor-not-allowed transition duration-300 rounded-md">{generateButtonText}</button>
                                     <button onClick={handleCopyPrompt} className="px-4 py-2 bg-theme-surface-2 text-white font-semibold hover:bg-theme-border transition duration-300 rounded-md">{copySuccess ? 'Copied!' : '📋 Copy Active Prompt'}</button>
                                     <button
@@ -191,7 +219,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
 
 
                     {/* --- Right Column: Image Display --- */}
-                     <div className="w-1/2 bg-theme-bg/50 p-4 flex items-center justify-center min-h-0 rounded-lg">
+                     <div className="w-full lg:w-1/2 bg-theme-bg/50 p-4 flex items-center justify-center min-h-[300px] lg:min-h-0 rounded-lg">
                         {error && <div className="text-center text-red-400 border border-red-500 p-4 rounded-lg"><p className="font-bold">An Error Occurred</p><p>{error}</p></div>}
                         {!error && isGenerating && <Loader message="Generating & saving..."/>}
                         {!error && !isGenerating && generatedImages.length === 0 && <div className="text-center text-theme-text-secondary">{ isConfigured ? 'Your generated images will appear here.' : 'Please set your API Key in Settings to generate images.'}</div>}
@@ -215,7 +243,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
             
             {enlargedImageSrc && (
                 <div 
-                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4"
                     onClick={() => setEnlargedImageSrc(null)}
                     role="dialog"
                     aria-modal="true"

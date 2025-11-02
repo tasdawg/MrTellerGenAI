@@ -3,6 +3,13 @@ interface ApiConfig {
     apiKey: string;
 }
 
+interface IndexEntry {
+    image_name: string;
+    image_json_file: string;
+    thumbnail: string;
+    header: string;
+}
+
 let apiConfig: ApiConfig = {
     baseUrl: '',
     apiKey: '',
@@ -36,6 +43,30 @@ export const testApiConnection = async (baseUrl: string): Promise<any> => {
     return handleResponse(response);
 };
 
+export const getIndexList = async (): Promise<any[]> => {
+    if (!apiConfig.baseUrl) throw new Error("API Base URL not configured.");
+    const response = await fetch(`${apiConfig.baseUrl}/index/list`, {
+        method: 'GET',
+        headers: getHeaders(),
+    });
+    return handleResponse(response);
+};
+
+export const addToIndex = async (entry: IndexEntry): Promise<any> => {
+    if (!apiConfig.baseUrl) throw new Error("API Base URL not configured.");
+    
+    const headers = getHeaders();
+    headers.append('Content-Type', 'application/json');
+
+    const response = await fetch(`${apiConfig.baseUrl}/index/add`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(entry),
+    });
+    return handleResponse(response);
+};
+
+
 export const uploadFile = async (file: Blob, filename: string): Promise<any> => {
     if (!apiConfig.baseUrl) throw new Error("API Base URL not configured.");
     
@@ -45,6 +76,21 @@ export const uploadFile = async (file: Blob, filename: string): Promise<any> => 
     const response = await fetch(`${apiConfig.baseUrl}/upload/`, {
         method: 'POST',
         headers: getHeaders(),
+        body: formData,
+    });
+    return handleResponse(response);
+};
+
+export const uploadReferenceImage = async (header: string, file: Blob, filename: string): Promise<any> => {
+    if (!apiConfig.baseUrl) throw new Error("API Base URL not configured.");
+    
+    const formData = new FormData();
+    formData.append('file', file, filename);
+    formData.append('header', header);
+
+    const response = await fetch(`${apiConfig.baseUrl}/upload/reference`, {
+        method: 'POST',
+        headers: getHeaders(), // No content-type, browser sets it for FormData
         body: formData,
     });
     return handleResponse(response);
