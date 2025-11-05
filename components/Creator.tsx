@@ -134,7 +134,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                                             }
                                         }}
                                         placeholder="Enter a custom prompt or apply one from AI Tools..."
-                                        className={`w-full h-24 p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition resize-y font-mono text-sm ${useStudioPrompt ? 'opacity-50' : ''}`}
+                                        className={`w-full h-72 p-2 bg-theme-surface border border-theme-border rounded-md focus:ring-1 focus:ring-theme-primary focus:border-theme-primary transition resize-y font-mono text-sm ${useStudioPrompt ? 'opacity-50' : ''}`}
                                     />
                                 </div>
                                 <div className="mt-2">
@@ -177,7 +177,7 @@ export const Creator = ({ state, handlers, collection }: { state: any, handlers:
                                         readOnly
                                         value={studioPrompt}
                                         placeholder="Your generated prompt will appear here..."
-                                        className={`w-full h-24 p-2 bg-theme-surface border border-theme-border rounded-md transition resize-none font-mono text-sm ${!useStudioPrompt ? 'opacity-50' : ''}`}
+                                        className={`w-full h-72 p-2 bg-theme-surface border border-theme-border rounded-md transition resize-none font-mono text-sm ${!useStudioPrompt ? 'opacity-50' : ''}`}
                                     />
                                 </div>
                                 <div className="mt-4 p-3 bg-theme-surface/50 rounded-md">
